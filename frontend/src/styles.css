@@ -495,6 +495,78 @@ button {
   color: #dce3f2;
 }
 
+.preview-grid,
+.minted-result-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.preview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preview-panel,
+.minted-thumb {
+  min-width: 0;
+  border-radius: 1.2rem;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1rem;
+}
+
+.preview-label {
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.preview-frame,
+.minted-thumb {
+  position: relative;
+  overflow: hidden;
+  min-height: 18rem;
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at top, rgba(84, 198, 255, 0.15), transparent 36%),
+    linear-gradient(180deg, rgba(4, 7, 15, 0.95), rgba(8, 12, 22, 0.98));
+}
+
+.preview-empty,
+.preview-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  color: #cfd8ea;
+}
+
+.preview-loading {
+  gap: 0.75rem;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.preview-image-ready {
+  opacity: 1;
+}
+
+.minted-result-grid {
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  align-items: stretch;
+}
+
 .notice-box {
   padding: 0.95rem 1rem;
   font-size: 0.95rem;
@@ -561,6 +633,8 @@ button {
   .top-grid,
   .hero-chip-row,
   .metric-grid,
+  .preview-grid,
+  .minted-result-grid,
   .button-row,
   .price-form,
   .mint-form-grid,

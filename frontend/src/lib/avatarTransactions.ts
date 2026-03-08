@@ -1,7 +1,11 @@
 import { Transaction } from "@mysten/sui/transactions";
 
 import { AVATAR_CONTRACT, AVATAR_TARGETS, AVATAR_TYPES } from "../config/avatarContract";
-import { buildAvatarMintPayload, type AvatarMintFormValues } from "./avatarMint";
+import {
+  buildAvatarMintPayload,
+  type AvatarMintFormValues,
+  type AvatarRendererAssets,
+} from "./avatarMint";
 
 export function buildPauseMintTx() {
   const tx = new Transaction();
@@ -49,9 +53,10 @@ function normalizeMistValue(mist: string) {
 
 function buildSharedMintArguments(
   tx: Transaction,
-  formValues: AvatarMintFormValues
+  formValues: AvatarMintFormValues,
+  rendererAssets: AvatarRendererAssets
 ) {
-  const payload = buildAvatarMintPayload(formValues);
+  const payload = buildAvatarMintPayload(formValues, rendererAssets);
 
   return [
     tx.pure.string(payload.name),
@@ -82,11 +87,12 @@ function buildSharedMintArguments(
 
 export function buildMintAvatarTx(
   formValues: AvatarMintFormValues,
-  mintPriceMist: string
+  mintPriceMist: string,
+  rendererAssets: AvatarRendererAssets
 ) {
   const normalizedPrice = normalizeMistValue(mintPriceMist);
   const tx = new Transaction();
-  const sharedArguments = buildSharedMintArguments(tx, formValues);
+  const sharedArguments = buildSharedMintArguments(tx, formValues, rendererAssets);
 
   if (normalizedPrice === "0") {
     tx.moveCall({

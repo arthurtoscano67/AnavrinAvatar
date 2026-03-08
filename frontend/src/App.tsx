@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Card } from "./components/Card";
 import { Spinner } from "./components/Spinner";
 import { AVATAR_CONTRACT } from "./config/avatarContract";
+import { AVATAR_RENDERER } from "./config/avatarRenderer";
 import { useAvatarActions } from "./hooks/useAvatarActions";
 import { useAvatarAdminState, useAvatarMintConfig } from "./hooks/useAvatarContract";
 import {
@@ -15,14 +16,17 @@ import {
   MINT_LIMITS,
   SKIN_TONE_OPTIONS,
   STYLE_OPTIONS,
+  buildAvatarRendererAssets,
   buildMintChoiceSummary,
   hasRequiredMintFields,
   type AvatarMintFormValues,
   type AvatarMintResult,
+  type AvatarRendererAssets,
 } from "./lib/avatarMint";
 import { parseError, shortAddress, toSui } from "./lib/format";
 
 type AppView = "dashboard" | "mint";
+type PreviewState = "idle" | "loading" | "ready" | "error";
 
 function getViewFromHash(): AppView {
   if (typeof window === "undefined") {
@@ -91,6 +95,10 @@ export function App() {
   const [priceInput, setPriceInput] = useState("");
   const [mintForm, setMintForm] = useState<AvatarMintFormValues>(() => ({ ...AVATAR_MINT_DEFAULTS }));
   const [mintResult, setMintResult] = useState<AvatarMintResult | null>(null);
+  const [lastMintAssets, setLastMintAssets] = useState<AvatarRendererAssets | null>(null);
+  const [imagePreviewState, setImagePreviewState] = useState<PreviewState>("idle");
+  const [motionPreviewState, setMotionPreviewState] = useState<PreviewState>("idle");
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mintConfig.data?.mintPriceMist) {
@@ -104,6 +112,27 @@ export function App() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  const rendererAssets = useMemo(() => {
+    if (!AVATAR_RENDERER.isConfigured) {
+      return null;
+    }
+
+    return buildAvatarRendererAssets(AVATAR_RENDERER.baseUrl, mintForm);
+  }, [mintForm]);
+
+  useEffect(() => {
+    if (!rendererAssets) {
+      setImagePreviewState("idle");
+      setMotionPreviewState("idle");
+      setPreviewError(null);
+      return;
+    }
+
+    setImagePreviewState("loading");
+    setMotionPreviewState("loading");
+    setPreviewError(null);
+  }, [rendererAssets?.imageUrl, rendererAssets?.motionPreviewUrl]);
 
   const adminOwner = adminState.data?.ownerAddress ?? "Unknown";
   const canAdmin = Boolean(account && adminState.data?.connectedIsAdmin);
@@ -134,8 +163,24 @@ export function App() {
       return "Mint is currently paused.";
     }
 
+    if (!AVATAR_RENDERER.isConfigured) {
+      return "Set VITE_AVATAR_RENDERER_URL so Railway can generate image and motion previews.";
+    }
+
     if (!hasRequiredMintFields(mintForm)) {
-      return "Fill in the required metadata and media URLs to mint.";
+      return "Fill in name and description, then Railway will handle the media automatically.";
+    }
+
+    if (!rendererAssets) {
+      return "Preparing Railway render URLs.";
+    }
+
+    if (previewError) {
+      return previewError;
+    }
+
+    if (imagePreviewState !== "ready") {
+      return "Waiting for the Railway image preview to load.";
     }
 
     if (pendingAction !== null) {
@@ -143,7 +188,17 @@ export function App() {
     }
 
     return null;
-  }, [account, mintConfig.data?.mintEnabled, mintConfig.error, mintConfig.isLoading, mintForm, pendingAction]);
+  }, [
+    account,
+    imagePreviewState,
+    mintConfig.data?.mintEnabled,
+    mintConfig.error,
+    mintConfig.isLoading,
+    mintForm,
+    pendingAction,
+    previewError,
+    rendererAssets,
+  ]);
 
   const switchView = (nextView: AppView) => {
     if (nextView === view) {
@@ -197,9 +252,15 @@ export function App() {
       return;
     }
 
+    if (!rendererAssets) {
+      toast.error("Railway renderer URLs are not ready.");
+      return;
+    }
+
     try {
-      const result = await mintAvatar(mintForm, mintConfig.data.mintPriceMist);
+      const result = await mintAvatar(mintForm, mintConfig.data.mintPriceMist, rendererAssets);
       setMintResult(result);
+      setLastMintAssets(rendererAssets);
       await mintConfig.refetch();
     } catch {
       // Toast handled in useTxExecutor or action hook.
@@ -224,11 +285,11 @@ export function App() {
       <main className="container">
         <section className="hero">
           <div className="hero-copy">
-            <div className="eyebrow">{view === "mint" ? "First NFT Mint" : "Sui Mainnet Dashboard"}</div>
+            <div className="eyebrow">{view === "mint" ? "Railway-Powered Mint" : "Sui Mainnet Dashboard"}</div>
             <h1>Anavrin Avatar</h1>
             <p>
               {view === "mint"
-                ? "Mint your first avatar NFT directly from the published anavrin::avatar module."
+                ? "Users customize once, Railway generates the artwork automatically, and the mint writes those media URLs into the NFT."
                 : "Read live contract state, adjust mint controls, and verify admin access for anavrin::avatar."}
             </p>
           </div>
@@ -257,8 +318,16 @@ export function App() {
                 <strong>Sui Mainnet</strong>
               </div>
               <div className="hero-chip">
+                <span>Renderer</span>
+                <strong>{AVATAR_RENDERER.isConfigured ? "Railway Connected" : "Not configured"}</strong>
+              </div>
+              <div className="hero-chip">
                 <span>Connected Wallet</span>
                 <strong>{shortAddress(account?.address)}</strong>
+              </div>
+              <div className="hero-chip">
+                <span>Mint Mode</span>
+                <strong>{mintModeLabel}</strong>
               </div>
             </div>
 
@@ -461,167 +530,217 @@ export function App() {
           </>
         ) : (
           <section className="mint-layout">
-            <Card title="Mint Avatar" eyebrow="Public Mint" tone="sky">
-              <div className="mint-form-grid">
-                <label className="field field-span-2">
-                  <FieldLabel label="Name" helper={`${mintForm.name.length}/${MINT_LIMITS.name}`} />
-                  <input
-                    className="input"
-                    maxLength={MINT_LIMITS.name}
-                    placeholder="Genesis Runner"
-                    value={mintForm.name}
-                    onChange={(event) => updateMintField("name", event.target.value)}
-                  />
-                </label>
+            <Card title="Customize Avatar" eyebrow="User Input" tone="sky">
+              <div className="stack">
+                <div className="info-box">
+                  <h3>Automatic Railway Media</h3>
+                  <p>
+                    Users only customize traits and metadata here. The image, portrait, and model
+                    URLs are generated automatically from the Railway renderer.
+                  </p>
+                  <small className="mono">
+                    Renderer base: {AVATAR_RENDERER.baseUrl || "VITE_AVATAR_RENDERER_URL not set"}
+                  </small>
+                </div>
 
-                <label className="field field-span-2">
-                  <FieldLabel
-                    label="Description"
-                    helper={`${mintForm.description.length}/${MINT_LIMITS.description}`}
-                  />
-                  <textarea
-                    className="textarea"
-                    maxLength={MINT_LIMITS.description}
-                    rows={4}
-                    value={mintForm.description}
-                    onChange={(event) => updateMintField("description", event.target.value)}
-                  />
-                </label>
+                <div className="mint-form-grid">
+                  <label className="field field-span-2">
+                    <FieldLabel label="Name" helper={`${mintForm.name.length}/${MINT_LIMITS.name}`} />
+                    <input
+                      className="input"
+                      maxLength={MINT_LIMITS.name}
+                      placeholder="Genesis Runner"
+                      value={mintForm.name}
+                      onChange={(event) => updateMintField("name", event.target.value)}
+                    />
+                  </label>
 
-                <label className="field field-span-2">
-                  <FieldLabel label="Image URL" helper={`${mintForm.imageUrl.length}/${MINT_LIMITS.uri}`} />
-                  <input
-                    className="input"
-                    maxLength={MINT_LIMITS.uri}
-                    value={mintForm.imageUrl}
-                    onChange={(event) => updateMintField("imageUrl", event.target.value)}
-                  />
-                </label>
+                  <label className="field field-span-2">
+                    <FieldLabel
+                      label="Description"
+                      helper={`${mintForm.description.length}/${MINT_LIMITS.description}`}
+                    />
+                    <textarea
+                      className="textarea"
+                      maxLength={MINT_LIMITS.description}
+                      rows={4}
+                      value={mintForm.description}
+                      onChange={(event) => updateMintField("description", event.target.value)}
+                    />
+                  </label>
 
-                <label className="field field-span-2">
-                  <FieldLabel
-                    label="Base Model URI"
-                    helper={`${mintForm.baseModelUri.length}/${MINT_LIMITS.uri}`}
-                  />
-                  <input
-                    className="input"
-                    maxLength={MINT_LIMITS.uri}
-                    value={mintForm.baseModelUri}
-                    onChange={(event) => updateMintField("baseModelUri", event.target.value)}
-                  />
-                </label>
+                  <label className="field">
+                    <FieldLabel label="Frame Type" />
+                    <select
+                      className="select"
+                      value={mintForm.frameType}
+                      onChange={(event) => updateMintField("frameType", Number(event.target.value))}
+                    >
+                      {FRAME_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="field field-span-2">
-                  <FieldLabel
-                    label="Portrait URI"
-                    helper={`${mintForm.portraitUri.length}/${MINT_LIMITS.uri}`}
-                  />
-                  <input
-                    className="input"
-                    maxLength={MINT_LIMITS.uri}
-                    value={mintForm.portraitUri}
-                    onChange={(event) => updateMintField("portraitUri", event.target.value)}
-                  />
-                </label>
+                  <label className="field">
+                    <FieldLabel label="Skin Tone" />
+                    <select
+                      className="select"
+                      value={mintForm.skinTone}
+                      onChange={(event) => updateMintField("skinTone", Number(event.target.value))}
+                    >
+                      {SKIN_TONE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="field">
-                  <FieldLabel label="Frame Type" />
-                  <select
-                    className="select"
-                    value={mintForm.frameType}
-                    onChange={(event) => updateMintField("frameType", Number(event.target.value))}
-                  >
-                    {FRAME_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="field">
+                    <FieldLabel label="Hair Type" />
+                    <select
+                      className="select"
+                      value={mintForm.hairType}
+                      onChange={(event) => updateMintField("hairType", Number(event.target.value))}
+                    >
+                      {HAIR_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="field">
-                  <FieldLabel label="Skin Tone" />
-                  <select
-                    className="select"
-                    value={mintForm.skinTone}
-                    onChange={(event) => updateMintField("skinTone", Number(event.target.value))}
-                  >
-                    {SKIN_TONE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="field">
+                    <FieldLabel label="Hair Color" />
+                    <select
+                      className="select"
+                      value={mintForm.hairColor}
+                      onChange={(event) => updateMintField("hairColor", Number(event.target.value))}
+                    >
+                      {HAIR_COLOR_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="field">
-                  <FieldLabel label="Hair Type" />
-                  <select
-                    className="select"
-                    value={mintForm.hairType}
-                    onChange={(event) => updateMintField("hairType", Number(event.target.value))}
-                  >
-                    {HAIR_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <FieldLabel label="Hair Color" />
-                  <select
-                    className="select"
-                    value={mintForm.hairColor}
-                    onChange={(event) => updateMintField("hairColor", Number(event.target.value))}
-                  >
-                    {HAIR_COLOR_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field field-span-2">
-                  <FieldLabel label="Style Type" />
-                  <select
-                    className="select"
-                    value={mintForm.styleType}
-                    onChange={(event) => updateMintField("styleType", Number(event.target.value))}
-                  >
-                    {STYLE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="field field-span-2">
+                    <FieldLabel label="Style Type" />
+                    <select
+                      className="select"
+                      value={mintForm.styleType}
+                      onChange={(event) => updateMintField("styleType", Number(event.target.value))}
+                    >
+                      {STYLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
             </Card>
 
-            <Card title="Mint Summary" eyebrow="Ready Check" tone="amber">
+            <Card title="Railway Preview" eyebrow="Auto-Generated Media" tone="amber">
               <div className="stack">
+                <div className="preview-grid">
+                  <div className="preview-panel">
+                    <div className="preview-label">Marketplace Image</div>
+                    <div className="preview-frame">
+                      {!rendererAssets ? (
+                        <div className="preview-empty">Configure the Railway renderer to load the preview.</div>
+                      ) : (
+                        <>
+                          {imagePreviewState === "loading" ? (
+                            <div className="preview-loading">
+                              <Spinner />
+                              <span>Loading Railway image...</span>
+                            </div>
+                          ) : null}
+                          <img
+                            alt="Avatar preview"
+                            className={`preview-image ${imagePreviewState === "ready" ? "preview-image-ready" : ""}`}
+                            key={rendererAssets.imageUrl}
+                            src={rendererAssets.imageUrl}
+                            onLoad={() => setImagePreviewState("ready")}
+                            onError={() => {
+                              setImagePreviewState("error");
+                              setPreviewError("Railway image preview failed to load.");
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="preview-panel">
+                    <div className="preview-label">Motion Scene</div>
+                    <div className="preview-frame">
+                      {!rendererAssets ? (
+                        <div className="preview-empty">Animated SVG preview appears here.</div>
+                      ) : (
+                        <>
+                          {motionPreviewState === "loading" ? (
+                            <div className="preview-loading">
+                              <Spinner />
+                              <span>Loading motion scene...</span>
+                            </div>
+                          ) : null}
+                          <img
+                            alt="Avatar motion preview"
+                            className={`preview-image ${motionPreviewState === "ready" ? "preview-image-ready" : ""}`}
+                            key={rendererAssets.motionPreviewUrl}
+                            src={rendererAssets.motionPreviewUrl}
+                            onLoad={() => setMotionPreviewState("ready")}
+                            onError={() => setMotionPreviewState("error")}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="info-box">
-                  <h3>Live Mint Status</h3>
+                  <h3>Generated Media Endpoints</h3>
                   <p>
-                    The button below uses the live on-chain config. It automatically switches between
-                    free mint and paid mint.
+                    These are filled automatically and used during mint. Users do not edit them.
+                  </p>
+                  <div className="stack">
+                    <DetailRow
+                      label="image_url"
+                      value={rendererAssets?.imageUrl ?? "Waiting for Railway renderer"}
+                      mono
+                    />
+                    <DetailRow
+                      label="portrait_uri"
+                      value={rendererAssets?.portraitUri ?? "Waiting for Railway renderer"}
+                      mono
+                    />
+                    <DetailRow
+                      label="base_model_uri"
+                      value={rendererAssets?.baseModelUri ?? "Waiting for Railway renderer"}
+                      mono
+                    />
+                  </div>
+                </div>
+
+                <div className="info-box">
+                  <h3>Mint Summary</h3>
+                  <p>
+                    Users customize traits here. Railway turns that into preview media, and the mint
+                    transaction writes those renderer URLs into the NFT.
                   </p>
 
                   <div className="metric-grid compact-grid">
                     <MetricTile label="Mint Mode" value={mintModeLabel} />
                     <MetricTile label="Mint Status" value={mintStatus} />
                   </div>
-                </div>
-
-                <div className="info-box">
-                  <h3>Starter Preset</h3>
-                  <p>
-                    This first mint page keeps the payload lean: you choose the key appearance inputs,
-                    and the rest of the avatar uses a stable starter profile.
-                  </p>
 
                   <div className="token-row">
                     {mintChoiceSummary.map((choice) => (
@@ -634,17 +753,26 @@ export function App() {
                   <small>Level 1 start, 10 base points in every stat, calm voice, relaxed idle.</small>
                 </div>
 
-                <div className={`notice-box ${mintGuardMessage ? "notice-box-warning" : "notice-box-success"}`}>
-                  {mintGuardMessage ?? "Ready to mint on mainnet."}
+                <div
+                  className={`notice-box ${mintGuardMessage ? "notice-box-warning" : "notice-box-success"}`}
+                >
+                  {mintGuardMessage ?? "Preview ready. Mint will use the Railway-generated media URLs."}
                 </div>
 
                 {mintResult ? (
                   <div className="info-box">
                     <h3>Latest Mint</h3>
-                    <div className="stack">
-                      <DetailRow label="Avatar ID" value={mintResult.avatarId ?? "Unavailable"} mono />
-                      <DetailRow label="Digest" value={mintResult.digest} mono />
-                      <DetailRow label="Owner" value={mintResult.owner ?? account?.address ?? "Unknown"} mono />
+                    <div className="minted-result-grid">
+                      <div className="minted-thumb">
+                        {lastMintAssets ? (
+                          <img alt="Minted avatar" className="preview-image preview-image-ready" src={lastMintAssets.imageUrl} />
+                        ) : null}
+                      </div>
+                      <div className="stack">
+                        <DetailRow label="Avatar ID" value={mintResult.avatarId ?? "Unavailable"} mono />
+                        <DetailRow label="Digest" value={mintResult.digest} mono />
+                        <DetailRow label="Owner" value={mintResult.owner ?? account?.address ?? "Unknown"} mono />
+                      </div>
                     </div>
                   </div>
                 ) : null}

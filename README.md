@@ -55,6 +55,23 @@ Files:
 
 Railway will detect the root `Dockerfile` automatically.
 
+## Railway Renderer
+
+The mint UI can also use a separate Railway renderer service in `renderer/` so users do not manually enter media URLs.
+
+Renderer routes:
+
+- `/api/avatar/image.svg`
+- `/api/avatar/portrait.svg`
+- `/api/avatar/motion.svg`
+- `/api/avatar/model.json`
+
+Frontend env:
+
+```bash
+VITE_AVATAR_RENDERER_URL=https://your-renderer.up.railway.app
+```
+
 ## Module
 
 - Package name: `anavrin`

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   extractMintedAvatar,
   type AvatarMintFormValues,
+  type AvatarRendererAssets,
 } from "../lib/avatarMint";
 import {
   buildMintAvatarTx,
@@ -65,12 +66,16 @@ export function useAvatarActions() {
   );
 
   const mintAvatar = useCallback(
-    async (formValues: AvatarMintFormValues, mintPriceMist: string) => {
+    async (
+      formValues: AvatarMintFormValues,
+      mintPriceMist: string,
+      rendererAssets: AvatarRendererAssets
+    ) => {
       requireWallet();
       let tx;
 
       try {
-        tx = buildMintAvatarTx(formValues, mintPriceMist);
+        tx = buildMintAvatarTx(formValues, mintPriceMist, rendererAssets);
       } catch (error) {
         toast.error(parseError(error));
         throw error;

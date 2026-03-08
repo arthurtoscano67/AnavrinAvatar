@@ -10,14 +10,18 @@ type MintOption = {
 export type AvatarMintFormValues = {
   name: string;
   description: string;
-  imageUrl: string;
-  baseModelUri: string;
-  portraitUri: string;
   frameType: number;
   skinTone: number;
   hairType: number;
   hairColor: number;
   styleType: number;
+};
+
+export type AvatarRendererAssets = {
+  imageUrl: string;
+  portraitUri: string;
+  baseModelUri: string;
+  motionPreviewUrl: string;
 };
 
 type AvatarMintPayload = {
@@ -107,9 +111,6 @@ export const STYLE_OPTIONS: MintOption[] = [
 export const AVATAR_MINT_DEFAULTS: AvatarMintFormValues = {
   name: "",
   description: "Genesis avatar for the Anavrin world.",
-  imageUrl: "https://placehold.co/1024x1024/png?text=Anavrin+Avatar",
-  baseModelUri: "https://example.com/anavrin/avatar/base.glb",
-  portraitUri: "https://placehold.co/768x768/png?text=Anavrin+Portrait",
   frameType: 0,
   skinTone: 1,
   hairType: 1,
@@ -144,14 +145,21 @@ function optionLabel(options: MintOption[], value: number) {
   return options.find((option) => option.value === value)?.label ?? String(value);
 }
 
+function buildRendererQuery(form: AvatarMintFormValues) {
+  const params = new URLSearchParams({
+    name: form.name.trim() || "Anavrin Avatar",
+    frameType: String(form.frameType),
+    skinTone: String(form.skinTone),
+    hairType: String(form.hairType),
+    hairColor: String(form.hairColor),
+    styleType: String(form.styleType),
+  });
+
+  return params.toString();
+}
+
 export function hasRequiredMintFields(form: AvatarMintFormValues) {
-  return Boolean(
-    form.name.trim() &&
-      form.description.trim() &&
-      form.imageUrl.trim() &&
-      form.baseModelUri.trim() &&
-      form.portraitUri.trim()
-  );
+  return Boolean(form.name.trim() && form.description.trim());
 }
 
 export function buildMintChoiceSummary(form: AvatarMintFormValues) {
@@ -164,13 +172,35 @@ export function buildMintChoiceSummary(form: AvatarMintFormValues) {
   ];
 }
 
-export function buildAvatarMintPayload(form: AvatarMintFormValues): AvatarMintPayload {
+export function buildAvatarRendererAssets(
+  rendererBaseUrl: string,
+  form: AvatarMintFormValues
+): AvatarRendererAssets {
+  const normalizedBaseUrl = rendererBaseUrl.trim().replace(/\/+$/, "");
+  if (!normalizedBaseUrl) {
+    throw new Error("Renderer URL is not configured.");
+  }
+
+  const query = buildRendererQuery(form);
+
+  return {
+    imageUrl: `${normalizedBaseUrl}/api/avatar/image.svg?${query}`,
+    portraitUri: `${normalizedBaseUrl}/api/avatar/portrait.svg?${query}`,
+    baseModelUri: `${normalizedBaseUrl}/api/avatar/model.json?${query}`,
+    motionPreviewUrl: `${normalizedBaseUrl}/api/avatar/motion.svg?${query}`,
+  };
+}
+
+export function buildAvatarMintPayload(
+  form: AvatarMintFormValues,
+  assets: AvatarRendererAssets
+): AvatarMintPayload {
   return {
     name: trimField(form.name, "Name", MINT_LIMITS.name),
     description: trimField(form.description, "Description", MINT_LIMITS.description),
-    imageUrl: trimField(form.imageUrl, "Image URL", MINT_LIMITS.uri),
-    baseModelUri: trimField(form.baseModelUri, "Base model URI", MINT_LIMITS.uri),
-    portraitUri: trimField(form.portraitUri, "Portrait URI", MINT_LIMITS.uri),
+    imageUrl: trimField(assets.imageUrl, "Image URL", MINT_LIMITS.uri),
+    baseModelUri: trimField(assets.baseModelUri, "Base model URI", MINT_LIMITS.uri),
+    portraitUri: trimField(assets.portraitUri, "Portrait URI", MINT_LIMITS.uri),
     frameType: form.frameType,
     skinTone: form.skinTone,
     hairType: form.hairType,
