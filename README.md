@@ -38,6 +38,12 @@ Default local URL:
 http://127.0.0.1:4174
 ```
 
+Published site:
+
+```bash
+https://arthurtoscano67.github.io/AnavrinAvatar/
+```
+
 ## Module
 
 - Package name: `anavrin`
