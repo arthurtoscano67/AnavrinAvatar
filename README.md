@@ -6,6 +6,7 @@ Sui Move package for the `anavrin::avatar` module.
 
 - `sources/avatar.move`: avatar minting, attachment equipment, XP, stat spending, and admin controls
 - `Move.toml`: package metadata and named address configuration
+- `frontend/`: standalone React dashboard for reading `MintConfig` and testing the first admin actions
 
 ## Build
 
@@ -17,6 +18,24 @@ Strict lint build:
 
 ```bash
 sui move build --warnings-are-errors
+```
+
+## Frontend
+
+The frontend is a separate React app inside `frontend/` so it does not share code or build output with any other site.
+
+Install and run:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Default local URL:
+
+```bash
+http://127.0.0.1:4174
 ```
 
 ## Module
