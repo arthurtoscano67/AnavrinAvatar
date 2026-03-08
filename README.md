@@ -44,6 +44,17 @@ Published site:
 https://arthurtoscano67.github.io/AnavrinAvatar/
 ```
 
+## Railway Docker Deploy
+
+This repo keeps the Move package at the root and the React app in `frontend/`, so the Docker build must target the frontend subdirectory.
+
+Files:
+
+- `Dockerfile`: multi-stage build for the React app
+- `.dockerignore`: trims the deploy context
+
+Railway will detect the root `Dockerfile` automatically.
+
 ## Module
 
 - Package name: `anavrin`
