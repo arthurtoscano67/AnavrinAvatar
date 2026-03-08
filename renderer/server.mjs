@@ -208,7 +208,22 @@ function badge(x, y, text, fill) {
 }
 
 function hoodieMarkup(appearance) {
-  const { palette } = appearance;
+  const { palette, frameType } = appearance;
+
+  if (frameType === 1) {
+    return `
+      ${outlinedPath("M350 1018 L350 772 C350 700 382 650 438 620 L478 600 L512 652 L546 600 L586 620 C642 650 674 700 674 772 L674 1018 Z", palette.hoodie)}
+      ${simplePath("M354 1018 L354 794 C354 734 380 696 422 674 C462 704 562 704 602 674 C644 696 670 734 670 794 L670 1018 Z", palette.hoodieShadow)}
+      ${outlinedPath("M410 630 C432 584 468 554 512 552 C556 554 592 584 614 630 L584 694 C560 672 536 662 512 662 C488 662 464 672 440 694 Z", palette.hoodie)}
+      ${outlinedPath("M430 626 C452 648 470 672 482 716", palette.hoodieShadow, 10)}
+      ${outlinedPath("M594 626 C572 648 554 672 542 716", palette.hoodieShadow, 10)}
+      ${outlinedStroke("M492 694 L482 804", palette.hoodieAccent, 10)}
+      ${outlinedStroke("M532 694 L542 816", palette.hoodieAccent, 10)}
+      ${outlinedCircle(482, 808, 9, palette.hoodieAccent, 8)}
+      ${outlinedCircle(542, 820, 9, palette.hoodieAccent, 8)}
+      ${outlinedStroke("M512 654 L512 1016", palette.hoodieAccent, 10)}
+    `;
+  }
 
   return `
     ${outlinedPath("M322 1018 L322 760 C322 690 358 642 422 614 L470 594 L512 650 L554 594 L602 614 C666 642 702 690 702 760 L702 1018 Z", palette.hoodie)}
@@ -230,22 +245,19 @@ function bangPath(startX, startY, controlX, controlY, endX, endY) {
 
 function locStrands(appearance) {
   const { hairHex } = appearance;
-  const highlight = highlightHairColor(appearance);
   const strands = [
-    [362, 300, 334, 382, 354, 494, false],
-    [406, 292, 394, 378, 412, 510, false],
-    [452, 286, 452, 368, 452, 522, false],
-    [508, 282, 510, 370, 516, 534, true],
-    [564, 286, 558, 370, 562, 522, false],
-    [616, 294, 606, 380, 612, 506, false],
-    [660, 304, 676, 390, 652, 492, false],
-  ];
+    [384, 302, 374, 344, 382, 414, false, 20],
+    [444, 294, 442, 338, 444, 402, false, 18],
+    [510, 288, 512, 336, 512, 406, true, 18],
+    [578, 294, 580, 338, 580, 402, false, 18],
+    [638, 302, 648, 344, 640, 414, false, 20],
+    ];
 
   return strands
-    .map(([sx, sy, cx, cy, ex, ey, highlight], index) => {
-      const d = `M ${sx} ${sy} C ${cx} ${cy}, ${cx + (index % 2 === 0 ? -18 : 18)} ${cy + 90}, ${ex} ${ey}`;
+    .map(([sx, sy, cx, cy, ex, ey, highlight, width], index) => {
+      const d = `M ${sx} ${sy} C ${cx} ${cy}, ${cx + (index % 2 === 0 ? -10 : 10)} ${cy + 42}, ${ex} ${ey}`;
       const fill = highlight ? highlightHairColor(appearance) : hairHex;
-      return outlinedStroke(d, fill, 24);
+      return outlinedStroke(d, fill, width);
     })
     .join("");
 }
@@ -284,20 +296,19 @@ function wavyFringe(appearance) {
   const { hairHex } = appearance;
   const highlight = highlightHairColor(appearance);
   const fringe = [
-    "M 354 324 C 372 302, 388 314, 402 342 C 414 368, 424 386, 430 424",
-    "M 418 306 C 446 286, 456 302, 458 344 C 460 382, 456 420, 460 462",
-    "M 492 298 C 512 284, 526 294, 532 340 C 536 378, 532 418, 540 468",
-    "M 566 308 C 590 292, 602 304, 604 348 C 606 388, 598 430, 600 462",
-    "M 634 326 C 658 310, 672 326, 676 362 C 680 402, 674 438, 676 464",
+    "M 372 326 C 388 306, 404 314, 416 340 C 424 360, 430 374, 432 394",
+    "M 438 314 C 454 296, 470 304, 476 338 C 480 364, 476 388, 474 406",
+    "M 546 314 C 530 296, 514 304, 508 338 C 504 364, 508 388, 510 406",
+    "M 612 326 C 596 306, 580 314, 568 340 C 560 360, 554 374, 552 394",
   ];
 
   return fringe
-    .map((d, index) => outlinedStroke(d, index === 2 ? highlight : hairHex, 24))
+    .map((d, index) => outlinedStroke(d, index === 1 ? highlight : hairHex, 20))
     .join("");
 }
 
 function hairMarkup(appearance) {
-  const { hairType, hairHex, palette } = appearance;
+  const { hairType, hairHex, palette, frameType } = appearance;
   const highlight = highlightHairColor(appearance);
 
   if (hairType === 0) {
@@ -305,11 +316,17 @@ function hairMarkup(appearance) {
   }
 
   if (hairType === 7) {
-    return outlinedPath(
-      "M 370 356 C 376 272, 452 218, 512 214 C 572 218, 648 272, 654 356 C 614 330, 566 316, 512 316 C 458 316, 410 330, 370 356 Z",
-      hairHex,
-      12
-    );
+    return frameType === 1
+      ? outlinedPath(
+          "M 388 354 C 394 284, 454 236, 512 232 C 570 236, 630 284, 636 354 C 602 334, 560 322, 512 322 C 464 322, 422 334, 388 354 Z",
+          hairHex,
+          12
+        )
+      : outlinedPath(
+          "M 370 356 C 376 272, 452 218, 512 214 C 572 218, 648 272, 654 356 C 614 330, 566 316, 512 316 C 458 316, 410 330, 370 356 Z",
+          hairHex,
+          12
+        );
   }
 
   const base = outlinedPath(
@@ -328,29 +345,48 @@ function hairMarkup(appearance) {
   }
 
   if (hairType === 4) {
-    return `${base}${sideTufts}${locStrands(appearance)}${braidEnds(appearance)}`;
+    return `
+      ${base}
+      ${outlinedStroke("M 404 320 C 430 300, 446 308, 448 356", hairHex, 18)}
+      ${outlinedStroke("M 620 320 C 594 300, 578 308, 576 356", highlight, 18)}
+      ${outlinedStroke("M 352 388 C 304 476, 300 606, 360 734", hairHex, 24)}
+      ${outlinedStroke("M 672 388 C 720 476, 724 606, 664 734", hairHex, 24)}
+      ${braidEnds(appearance)}
+    `;
   }
 
   if (hairType === 5) {
-    return `${base}${sideTufts}${locStrands(appearance)}${outlinedStroke("M 318 406 C 292 454, 298 536, 334 592", hairHex, 28)}${outlinedStroke("M 706 406 C 732 454, 726 536, 690 592", hairHex, 28)}`;
+    return `
+      ${base}
+      ${sideTufts}
+      ${locStrands(appearance)}
+      ${outlinedStroke("M 330 402 C 300 470, 302 558, 340 636", hairHex, 24)}
+      ${outlinedStroke("M 694 402 C 724 470, 722 558, 684 636", hairHex, 24)}
+    `;
   }
 
   if (hairType === 6) {
     return `
       ${base}
       ${sideTufts}
-      ${outlinedStroke("M 650 254 C 734 308, 748 430, 680 526", hairHex, 26)}
-      ${outlinedStroke(bangPath(390, 314, 404, 346, 396, 420), hairHex, 24)}
-      ${outlinedStroke(bangPath(456, 300, 458, 342, 458, 446), highlight, 22)}
-      ${outlinedStroke(bangPath(520, 298, 522, 342, 520, 472), hairHex, 24)}
-      ${outlinedStroke(bangPath(586, 308, 592, 348, 590, 450), hairHex, 24)}
+      ${outlinedStroke("M 648 248 C 734 306, 742 430, 676 544", hairHex, 24)}
+      ${outlinedStroke("M 410 324 C 434 300, 450 310, 448 356", hairHex, 18)}
+      ${outlinedStroke("M 614 324 C 590 300, 574 310, 576 356", highlight, 18)}
+      ${outlinedStroke("M 338 404 C 308 454, 310 534, 350 592", hairHex, 20)}
+      ${outlinedStroke("M 686 404 C 716 454, 714 534, 674 592", hairHex, 20)}
     `;
   }
 
   if (hairType === 2) {
     return `
-      ${outlinedPath("M 316 380 C 314 246, 430 164, 512 164 C 594 164, 710 246, 708 380 C 706 468, 690 536, 656 610 C 618 566, 564 544, 512 544 C 460 544, 406 566, 368 610 C 334 536, 318 468, 316 380 Z", hairHex, 12)}
-      ${wavyFringe(appearance)}
+      ${base}
+      ${sideTufts}
+      ${outlinedStroke("M 406 322 C 432 300, 448 308, 450 360", hairHex, 18)}
+      ${outlinedStroke("M 618 322 C 592 300, 576 308, 574 360", highlight, 18)}
+      ${outlinedStroke("M 344 404 C 310 520, 326 648, 396 760", hairHex, 28)}
+      ${outlinedStroke("M 680 404 C 714 520, 698 648, 628 760", hairHex, 28)}
+      ${outlinedStroke("M 378 398 C 356 500, 370 612, 422 714", hairHex, 20)}
+      ${outlinedStroke("M 646 398 C 668 500, 654 612, 602 714", hairHex, 20)}
     `;
   }
 
@@ -361,10 +397,10 @@ function hairMarkup(appearance) {
   if (hairType === 1) {
     return `
       ${base}
-      ${outlinedStroke(bangPath(384, 316, 396, 342, 388, 402), hairHex, 24)}
-      ${outlinedStroke(bangPath(450, 304, 460, 338, 452, 424), highlight, 22)}
-      ${outlinedStroke(bangPath(520, 302, 520, 338, 516, 444), hairHex, 24)}
-      ${outlinedStroke(bangPath(592, 308, 596, 346, 588, 432), hairHex, 24)}
+      ${outlinedStroke(bangPath(398, 320, 406, 340, 402, 392), hairHex, 20)}
+      ${outlinedStroke(bangPath(458, 312, 464, 336, 462, 386), highlight, 18)}
+      ${outlinedStroke(bangPath(566, 312, 560, 336, 562, 386), hairHex, 18)}
+      ${outlinedStroke(bangPath(626, 320, 618, 340, 622, 392), hairHex, 20)}
     `;
   }
 
@@ -417,8 +453,40 @@ function animeBlush(frameType, x, y, opacity = 0.18) {
   return `<ellipse cx="${x}" cy="${y}" rx="24" ry="14" fill="${blush}" fill-opacity="${opacity}" />`;
 }
 
+function headMarkup(appearance, headY) {
+  const { frameType, skinHex } = appearance;
+
+  if (frameType === 1) {
+    return outlinedPath(
+      `M 512 ${headY - 176}
+       C 428 ${headY - 176}, 360 ${headY - 106}, 358 ${headY}
+       C 356 ${headY + 112}, 424 ${headY + 198}, 512 ${headY + 224}
+       C 600 ${headY + 198}, 668 ${headY + 112}, 666 ${headY}
+       C 664 ${headY - 106}, 596 ${headY - 176}, 512 ${headY - 176} Z`,
+      skinHex
+    );
+  }
+
+  return outlinedPath(
+    `M 512 ${headY - 180}
+     C 414 ${headY - 180}, 338 ${headY - 100}, 342 ${headY + 8}
+     C 346 ${headY + 108}, 394 ${headY + 190}, 454 ${headY + 220}
+     C 492 ${headY + 242}, 532 ${headY + 242}, 570 ${headY + 220}
+     C 630 ${headY + 190}, 678 ${headY + 108}, 682 ${headY + 8}
+     C 686 ${headY - 100}, 610 ${headY - 180}, 512 ${headY - 180} Z`,
+    skinHex
+  );
+}
+
 function faceMarkup(appearance) {
   const { facePreset, frameType, skinHex } = appearance;
+  const leftEyeX = frameType === 1 ? 444 : 438;
+  const rightEyeX = frameType === 1 ? 580 : 586;
+  const earLeftX = frameType === 1 ? 352 : 346;
+  const earRightX = frameType === 1 ? 672 : 678;
+  const browLeft = frameType === 1 ? [394, 478] : [382, 494];
+  const browRight = frameType === 1 ? [546, 630] : [530, 642];
+  const eyeYOffset = frameType === 1 ? -4 : 2;
 
   let eyes = "";
   let brows = "";
@@ -426,62 +494,66 @@ function faceMarkup(appearance) {
   let cheeks = "";
 
   if (facePreset === 0) {
-    eyes = `${animeSmileEye(442, 456)}${animeSmileEye(582, 456)}`;
+    eyes = `${animeSmileEye(leftEyeX, 454 + eyeYOffset)}${animeSmileEye(rightEyeX, 454 + eyeYOffset)}`;
     brows = `
-      ${solidStroke("M 388 406 C 420 382, 456 380, 490 394", OUTLINE, 9)}
-      ${solidStroke("M 534 394 C 568 380, 604 382, 636 406", OUTLINE, 9)}
+      ${solidStroke(`M ${browLeft[0]} 402 C 420 382, 452 380, ${browLeft[1]} 392`, OUTLINE, frameType === 1 ? 8 : 9)}
+      ${solidStroke(`M ${browRight[0]} 392 C 572 380, 604 382, ${browRight[1]} 402`, OUTLINE, frameType === 1 ? 8 : 9)}
     `;
     mouth = solidStroke("M 464 578 C 496 604, 538 604, 568 578", OUTLINE, 8);
-    cheeks = `${animeBlush(frameType, 386, 536, 0.24)}${animeBlush(frameType, 640, 536, 0.24)}`;
+    cheeks = `${animeBlush(frameType, 390, 534, frameType === 1 ? 0.28 : 0.18)}${animeBlush(frameType, 634, 534, frameType === 1 ? 0.28 : 0.18)}`;
   } else if (facePreset === 1) {
-    eyes = `${animeOpenEye(442, 462)}${animeOpenEye(582, 462)}`;
+    eyes = `${animeOpenEye(leftEyeX, 458 + eyeYOffset, frameType === 1 ? 68 : 60, frameType === 1 ? 78 : 68)}${animeOpenEye(rightEyeX, 458 + eyeYOffset, frameType === 1 ? 68 : 60, frameType === 1 ? 78 : 68)}`;
     brows = `
-      ${solidStroke("M 390 398 C 424 378, 458 378, 490 392", OUTLINE, 8)}
-      ${solidStroke("M 534 392 C 566 378, 600 378, 634 398", OUTLINE, 8)}
+      ${solidStroke(`M ${browLeft[0]} 394 C 424 378, 456 378, ${browLeft[1]} 390`, OUTLINE, frameType === 1 ? 7 : 8)}
+      ${solidStroke(`M ${browRight[0]} 390 C 568 378, 600 378, ${browRight[1]} 394`, OUTLINE, frameType === 1 ? 7 : 8)}
     `;
     mouth = solidStroke("M 474 582 C 502 596, 540 596, 566 578", OUTLINE, 7);
-    cheeks = `${animeBlush(frameType, 388, 540, 0.14)}${animeBlush(frameType, 638, 540, 0.14)}`;
+    cheeks = `${animeBlush(frameType, 392, 538, frameType === 1 ? 0.2 : 0.1)}${animeBlush(frameType, 632, 538, frameType === 1 ? 0.2 : 0.1)}`;
   } else if (facePreset === 2) {
-    eyes = `${animeAlmondEye(442, 458)}${animeAlmondEye(582, 458)}`;
+    eyes = `${animeAlmondEye(leftEyeX, 454 + eyeYOffset, frameType === 1 ? 146 : 134, frameType === 1 ? 88 : 78)}${animeAlmondEye(rightEyeX, 454 + eyeYOffset, frameType === 1 ? 146 : 134, frameType === 1 ? 88 : 78)}`;
     brows = `
-      ${solidStroke("M 382 404 C 418 372, 462 368, 500 382", OUTLINE, 10)}
-      ${solidStroke("M 524 382 C 562 368, 606 372, 642 404", OUTLINE, 10)}
+      ${solidStroke(`M ${frameType === 1 ? 390 : 382} 402 C 420 372, 462 368, ${frameType === 1 ? 494 : 500} 380`, OUTLINE, frameType === 1 ? 8 : 10)}
+      ${solidStroke(`M ${frameType === 1 ? 530 : 524} 380 C 562 368, 604 372, ${frameType === 1 ? 634 : 642} 402`, OUTLINE, frameType === 1 ? 8 : 10)}
     `;
     mouth = solidStroke("M 474 584 C 504 594, 544 590, 576 576", OUTLINE, 8);
   } else if (facePreset === 3) {
-    eyes = `${animeSmileEye(438, 458, 86, 20)}${animeOpenEye(586, 462, 60, 68)}`;
+    eyes = `${animeSmileEye(leftEyeX - 2, 456 + eyeYOffset, 84, 20)}${animeOpenEye(rightEyeX + 2, 458 + eyeYOffset, frameType === 1 ? 66 : 58, frameType === 1 ? 76 : 66)}`;
     brows = `
-      ${solidStroke("M 388 402 C 420 384, 454 386, 484 398", OUTLINE, 8)}
-      ${solidStroke("M 540 392 C 570 374, 602 374, 632 388", OUTLINE, 9)}
+      ${solidStroke(`M ${frameType === 1 ? 396 : 388} 398 C 422 384, 452 386, ${frameType === 1 ? 486 : 484} 396`, OUTLINE, 8)}
+      ${solidStroke(`M ${frameType === 1 ? 548 : 540} 388 C 572 374, 602 374, ${frameType === 1 ? 628 : 632} 384`, OUTLINE, frameType === 1 ? 8 : 9)}
     `;
     mouth = solidStroke("M 468 580 C 500 602, 542 598, 572 572", OUTLINE, 8);
-    cheeks = `${animeBlush(frameType, 390, 540, 0.18)}${animeBlush(frameType, 640, 540, 0.18)}`;
+    cheeks = `${animeBlush(frameType, 392, 538, frameType === 1 ? 0.22 : 0.14)}${animeBlush(frameType, 636, 538, frameType === 1 ? 0.22 : 0.14)}`;
   } else {
-    eyes = `${animeSleepyEye(442, 468)}${animeSleepyEye(582, 468)}`;
+    eyes = `${animeSleepyEye(leftEyeX, 462 + eyeYOffset)}${animeSleepyEye(rightEyeX, 462 + eyeYOffset)}`;
     brows = `
-      ${solidStroke("M 392 398 C 424 390, 456 390, 488 398", OUTLINE, 8)}
-      ${solidStroke("M 536 398 C 568 390, 600 390, 632 398", OUTLINE, 8)}
+      ${solidStroke(`M ${frameType === 1 ? 398 : 392} 396 C 426 388, 454 388, ${frameType === 1 ? 486 : 488} 394`, OUTLINE, 7)}
+      ${solidStroke(`M ${frameType === 1 ? 538 : 536} 394 C 570 388, 598 388, ${frameType === 1 ? 626 : 632} 396`, OUTLINE, 7)}
     `;
     mouth = solidStroke("M 486 586 C 508 592, 532 592, 552 586", OUTLINE, 6);
-    cheeks = `${animeBlush(frameType, 388, 544, 0.1)}${animeBlush(frameType, 638, 544, 0.1)}`;
+    cheeks = `${animeBlush(frameType, 394, 540, frameType === 1 ? 0.16 : 0.08)}${animeBlush(frameType, 630, 540, frameType === 1 ? 0.16 : 0.08)}`;
   }
 
   return `
-    ${outlinedCircle(348, 472, 24, skinHex, 10)}
-    ${outlinedCircle(676, 472, 24, skinHex, 10)}
+    ${outlinedCircle(earLeftX, 472, frameType === 1 ? 22 : 24, skinHex, 10)}
+    ${outlinedCircle(earRightX, 472, frameType === 1 ? 22 : 24, skinHex, 10)}
     ${brows}
     ${eyes}
-    ${outlinedEllipse(514, 542, 7, 5, "#8f624d", 4)}
+    ${outlinedEllipse(514, frameType === 1 ? 538 : 544, frameType === 1 ? 6 : 7, frameType === 1 ? 4 : 5, "#8f624d", 4)}
     ${mouth}
     ${cheeks}
   `;
 }
 
 function avatarSvg(appearance, { animated = false, portrait = false, debug = false }) {
-  const { name, frameLabel, skinLabel, hairLabel, faceLabel, styleLabel, palette, skinHex } = appearance;
+  const { name, frameLabel, skinLabel, hairLabel, faceLabel, styleLabel, palette, skinHex, frameType } = appearance;
   const headY = portrait ? 420 : 432;
   const bodyTranslateY = portrait ? 24 : 40;
   const badgeY = portrait ? 98 : 112;
+  const neckX = frameType === 1 ? 486 : 474;
+  const neckWidth = frameType === 1 ? 52 : 76;
+  const neckHeight = frameType === 1 ? 78 : 84;
+  const neckRadius = frameType === 1 ? 20 : 24;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
@@ -532,8 +604,8 @@ function avatarSvg(appearance, { animated = false, portrait = false, debug = fal
           <g transform="translate(0 ${bodyTranslateY})" filter="url(#softShadow)">
             <ellipse cx="512" cy="902" rx="${portrait ? 150 : 196}" ry="46" fill="#09111f" fill-opacity="0.24" />
             ${hoodieMarkup(appearance)}
-            ${outlinedRect(476, 586, 72, 82, 24, skinHex, 10)}
-            ${outlinedCircle(512, headY, 176, skinHex)}
+            ${outlinedRect(neckX, 586, neckWidth, neckHeight, neckRadius, skinHex, 10)}
+            ${headMarkup(appearance, headY)}
             ${faceMarkup(appearance)}
             ${hairMarkup(appearance)}
           </g>
