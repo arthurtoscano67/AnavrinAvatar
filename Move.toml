@@ -1,0 +1,6 @@
+[package]
+name = "anavrin"
+edition = "2024"
+
+[addresses]
+anavrin = "0xc4eb339c26f7d48d803a369c0da9aff09db346ba62916b915eb68df74d808b76"
