@@ -32,5 +32,22 @@ export function useTxExecutor() {
     [client, mutateAsync]
   );
 
-  return { execute };
+  const executeAndFetchBlock = useCallback(
+    async (tx: Transaction, successMessage?: string) => {
+      const digest = await execute(tx, successMessage);
+      const block = await client.getTransactionBlock({
+        digest,
+        options: {
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      return { block, digest };
+    },
+    [client, execute]
+  );
+
+  return { execute, executeAndFetchBlock };
 }

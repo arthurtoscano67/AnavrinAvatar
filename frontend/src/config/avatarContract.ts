@@ -9,6 +9,8 @@ export const AVATAR_CONTRACT = {
 } as const;
 
 export const AVATAR_TARGETS = {
+  mintAvatar: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::mint_avatar`,
+  mintAvatarFree: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::mint_avatar_free`,
   pauseMint: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::pause_mint`,
   resumeMint: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::resume_mint`,
   setMintPrice: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::set_mint_price`,
@@ -16,5 +18,11 @@ export const AVATAR_TARGETS = {
 
 export const AVATAR_TYPES = {
   adminCap: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::AdminCap`,
+  attribute: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::Attribute`,
+  avatar: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::Avatar`,
   mintConfig: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::MintConfig`,
+} as const;
+
+export const AVATAR_EVENTS = {
+  avatarMinted: `${AVATAR_CONTRACT.packageId}::${AVATAR_CONTRACT.module}::AvatarMinted`,
 } as const;

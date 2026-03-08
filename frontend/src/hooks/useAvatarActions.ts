@@ -1,14 +1,25 @@
 import { useCallback, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
+import { toast } from "sonner";
 
-import { buildPauseMintTx, buildResumeMintTx, buildSetMintPriceTx } from "../lib/avatarTransactions";
+import {
+  extractMintedAvatar,
+  type AvatarMintFormValues,
+} from "../lib/avatarMint";
+import {
+  buildMintAvatarTx,
+  buildPauseMintTx,
+  buildResumeMintTx,
+  buildSetMintPriceTx,
+} from "../lib/avatarTransactions";
+import { parseError } from "../lib/format";
 import { useTxExecutor } from "./useTxExecutor";
 
-type PendingAction = "pause" | "resume" | "set-price" | null;
+type PendingAction = "mint" | "pause" | "resume" | "set-price" | null;
 
 export function useAvatarActions() {
   const account = useCurrentAccount();
-  const { execute } = useTxExecutor();
+  const { execute, executeAndFetchBlock } = useTxExecutor();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   const requireWallet = useCallback(() => {
@@ -53,8 +64,35 @@ export function useAvatarActions() {
     [execute, requireWallet]
   );
 
+  const mintAvatar = useCallback(
+    async (formValues: AvatarMintFormValues, mintPriceMist: string) => {
+      requireWallet();
+      let tx;
+
+      try {
+        tx = buildMintAvatarTx(formValues, mintPriceMist);
+      } catch (error) {
+        toast.error(parseError(error));
+        throw error;
+      }
+
+      setPendingAction("mint");
+
+      try {
+        const successMessage =
+          mintPriceMist.trim() === "0" ? "Avatar minted" : "Avatar minted successfully";
+        const { block, digest } = await executeAndFetchBlock(tx, successMessage);
+        return extractMintedAvatar(block, digest);
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [executeAndFetchBlock, requireWallet]
+  );
+
   return {
     pendingAction,
+    mintAvatar,
     pauseMint,
     resumeMint,
     setMintPrice,

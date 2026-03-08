@@ -4,10 +4,33 @@ import { toast } from "sonner";
 
 import { Card } from "./components/Card";
 import { Spinner } from "./components/Spinner";
+import { AVATAR_CONTRACT } from "./config/avatarContract";
 import { useAvatarActions } from "./hooks/useAvatarActions";
 import { useAvatarAdminState, useAvatarMintConfig } from "./hooks/useAvatarContract";
-import { AVATAR_CONTRACT } from "./config/avatarContract";
+import {
+  AVATAR_MINT_DEFAULTS,
+  FRAME_OPTIONS,
+  HAIR_COLOR_OPTIONS,
+  HAIR_TYPE_OPTIONS,
+  MINT_LIMITS,
+  SKIN_TONE_OPTIONS,
+  STYLE_OPTIONS,
+  buildMintChoiceSummary,
+  hasRequiredMintFields,
+  type AvatarMintFormValues,
+  type AvatarMintResult,
+} from "./lib/avatarMint";
 import { parseError, shortAddress, toSui } from "./lib/format";
+
+type AppView = "dashboard" | "mint";
+
+function getViewFromHash(): AppView {
+  if (typeof window === "undefined") {
+    return "dashboard";
+  }
+
+  return window.location.hash === "#mint" ? "mint" : "dashboard";
+}
 
 function DetailRow({
   label,
@@ -44,12 +67,30 @@ function MetricTile({
   );
 }
 
+function FieldLabel({
+  label,
+  helper,
+}: {
+  label: string;
+  helper?: string;
+}) {
+  return (
+    <div className="field-head">
+      <span>{label}</span>
+      {helper ? <small>{helper}</small> : null}
+    </div>
+  );
+}
+
 export function App() {
   const account = useCurrentAccount();
   const mintConfig = useAvatarMintConfig();
   const adminState = useAvatarAdminState();
-  const { pendingAction, pauseMint, resumeMint, setMintPrice } = useAvatarActions();
+  const { pendingAction, mintAvatar, pauseMint, resumeMint, setMintPrice } = useAvatarActions();
+  const [view, setView] = useState<AppView>(() => getViewFromHash());
   const [priceInput, setPriceInput] = useState("");
+  const [mintForm, setMintForm] = useState<AvatarMintFormValues>(() => ({ ...AVATAR_MINT_DEFAULTS }));
+  const [mintResult, setMintResult] = useState<AvatarMintResult | null>(null);
 
   useEffect(() => {
     if (mintConfig.data?.mintPriceMist) {
@@ -57,13 +98,62 @@ export function App() {
     }
   }, [mintConfig.data?.mintPriceMist]);
 
+  useEffect(() => {
+    const handleHashChange = () => setView(getViewFromHash());
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
   const adminOwner = adminState.data?.ownerAddress ?? "Unknown";
   const canAdmin = Boolean(account && adminState.data?.connectedIsAdmin);
   const mintStatus = mintConfig.data?.mintEnabled ? "Enabled" : "Paused";
+  const mintPriceMist = mintConfig.data?.mintPriceMist ?? "0";
+  const isFreeMint = mintPriceMist === "0";
+  const mintModeLabel = isFreeMint ? "Free Mint" : `${mintPriceMist} MIST`;
+  const mintChoiceSummary = useMemo(() => buildMintChoiceSummary(mintForm), [mintForm]);
   const treasuryDisplay = useMemo(() => {
     const treasury = mintConfig.data?.treasuryBalanceMist;
     return treasury ? `${treasury} MIST` : "Unavailable";
   }, [mintConfig.data?.treasuryBalanceMist]);
+
+  const mintGuardMessage = useMemo(() => {
+    if (!account) {
+      return "Connect a wallet to mint your first avatar.";
+    }
+
+    if (mintConfig.isLoading) {
+      return "Reading live MintConfig before minting.";
+    }
+
+    if (mintConfig.error) {
+      return "MintConfig could not be read from chain.";
+    }
+
+    if (!mintConfig.data?.mintEnabled) {
+      return "Mint is currently paused.";
+    }
+
+    if (!hasRequiredMintFields(mintForm)) {
+      return "Fill in the required metadata and media URLs to mint.";
+    }
+
+    if (pendingAction !== null) {
+      return "Wait for the current transaction to finish.";
+    }
+
+    return null;
+  }, [account, mintConfig.data?.mintEnabled, mintConfig.error, mintConfig.isLoading, mintForm, pendingAction]);
+
+  const switchView = (nextView: AppView) => {
+    if (nextView === view) {
+      return;
+    }
+
+    window.location.hash = nextView === "mint" ? "mint" : "dashboard";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setView(nextView);
+  };
 
   const refreshMintConfig = async () => {
     const result = await mintConfig.refetch();
@@ -101,6 +191,31 @@ export function App() {
     }
   };
 
+  const handleMintAvatar = async () => {
+    if (!mintConfig.data) {
+      toast.error("MintConfig is not ready yet.");
+      return;
+    }
+
+    try {
+      const result = await mintAvatar(mintForm, mintConfig.data.mintPriceMist);
+      setMintResult(result);
+      await mintConfig.refetch();
+    } catch {
+      // Toast handled in useTxExecutor or action hook.
+    }
+  };
+
+  const updateMintField = <Field extends keyof AvatarMintFormValues>(
+    field: Field,
+    value: AvatarMintFormValues[Field]
+  ) => {
+    setMintForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   return (
     <div className="app-shell">
       <div className="background-orb background-orb-left" />
@@ -109,213 +224,456 @@ export function App() {
       <main className="container">
         <section className="hero">
           <div className="hero-copy">
-            <div className="eyebrow">Sui Mainnet Dashboard</div>
+            <div className="eyebrow">{view === "mint" ? "First NFT Mint" : "Sui Mainnet Dashboard"}</div>
             <h1>Anavrin Avatar</h1>
             <p>
-              Read live contract state for <span className="mono">anavrin::avatar</span> and test
-              the first admin mint controls with programmable transaction blocks.
+              {view === "mint"
+                ? "Mint your first avatar NFT directly from the published anavrin::avatar module."
+                : "Read live contract state, adjust mint controls, and verify admin access for anavrin::avatar."}
             </p>
           </div>
 
           <div className="hero-panel">
-            <div className="hero-chip">
-              <span>Network</span>
-              <strong>Sui Mainnet</strong>
+            <div className="view-tabs" role="tablist" aria-label="Anavrin Avatar sections">
+              <button
+                className={`view-tab ${view === "dashboard" ? "view-tab-active" : ""}`}
+                onClick={() => switchView("dashboard")}
+                type="button"
+              >
+                Dashboard
+              </button>
+              <button
+                className={`view-tab ${view === "mint" ? "view-tab-active" : ""}`}
+                onClick={() => switchView("mint")}
+                type="button"
+              >
+                Mint Avatar
+              </button>
             </div>
-            <div className="hero-chip">
-              <span>Connected Wallet</span>
-              <strong>{shortAddress(account?.address)}</strong>
+
+            <div className="hero-chip-row">
+              <div className="hero-chip">
+                <span>Network</span>
+                <strong>Sui Mainnet</strong>
+              </div>
+              <div className="hero-chip">
+                <span>Connected Wallet</span>
+                <strong>{shortAddress(account?.address)}</strong>
+              </div>
             </div>
+
             <ConnectButton />
           </div>
-        </section>
-
-        <section className="top-grid">
-          <Card title="Admin State" eyebrow="Access" tone="amber">
-            {adminState.isLoading ? (
-              <div className="loading-row">
-                <Spinner />
-                <span>Reading AdminCap ownership...</span>
-              </div>
-            ) : (
-              <div className="stack">
-                <div className={`pill ${canAdmin ? "pill-success" : "pill-muted"}`}>
-                  {canAdmin ? "Connected wallet can administer this contract" : "Read-only mode"}
-                </div>
-                <DetailRow label="AdminCap Owner" value={adminOwner} mono />
-                <DetailRow
-                  label="Connected Wallet"
-                  value={account?.address ?? "Connect wallet to unlock write actions"}
-                  mono
-                />
-              </div>
-            )}
-          </Card>
-
-          <Card title="Contract Info" eyebrow="References" tone="sky">
-            <div className="stack">
-              <DetailRow label="Package ID" value={AVATAR_CONTRACT.packageId} mono />
-              <DetailRow label="Module Name" value={AVATAR_CONTRACT.module} mono />
-              <DetailRow label="Mint Config ID" value={AVATAR_CONTRACT.mintConfigId} mono />
-              <DetailRow label="Transfer Policy ID" value={AVATAR_CONTRACT.transferPolicyId} mono />
-            </div>
-          </Card>
         </section>
 
         {!account ? (
           <section className="connect-banner">
             <div>
               <div className="eyebrow">Wallet Required</div>
-              <h2>Connect a wallet to test admin actions</h2>
+              <h2>Connect a wallet to write to chain</h2>
               <p>
-                Reading chain state works without a wallet. Write calls require the wallet that owns
-                the configured AdminCap.
+                Reads work without a wallet. Minting and admin actions require a connected Sui wallet.
               </p>
             </div>
             <ConnectButton />
           </section>
         ) : null}
 
-        <section className="dashboard-grid">
-          <Card
-            title="Mint Config"
-            eyebrow="On-Chain State"
-            tone="sky"
-            action={
-              <button
-                className="button button-ghost"
-                onClick={refreshMintConfig}
-                disabled={mintConfig.isFetching}
-                type="button"
-              >
-                {mintConfig.isFetching ? "Refreshing..." : "Read Mint Config"}
-              </button>
-            }
-          >
-            {mintConfig.isLoading ? (
-              <div className="loading-row">
-                <Spinner />
-                <span>Loading MintConfig object from chain...</span>
-              </div>
-            ) : mintConfig.error ? (
-              <div className="error-box">{parseError(mintConfig.error)}</div>
-            ) : (
-              <div className="metric-grid">
-                <MetricTile
-                  label="mint_price_mist"
-                  value={`${mintConfig.data?.mintPriceMist ?? "0"} MIST`}
-                  helper={`≈ ${toSui(mintConfig.data?.mintPriceMist)} SUI`}
-                />
-                <MetricTile
-                  label="mint_enabled"
-                  value={mintStatus}
-                  helper={
-                    mintConfig.data?.ownerKind === "shared" ? "Shared object" : "Owner state unavailable"
-                  }
-                />
-                <MetricTile
-                  label="treasury balance"
-                  value={treasuryDisplay}
-                  helper={`≈ ${toSui(mintConfig.data?.treasuryBalanceMist)} SUI`}
-                />
-                <div className="status-box">
-                  <span>Status</span>
-                  <div className={`pill ${mintConfig.data?.mintEnabled ? "pill-success" : "pill-danger"}`}>
-                    {mintStatus}
+        {view === "dashboard" ? (
+          <>
+            <section className="top-grid">
+              <Card title="Admin State" eyebrow="Access" tone="amber">
+                {adminState.isLoading ? (
+                  <div className="loading-row">
+                    <Spinner />
+                    <span>Reading AdminCap ownership...</span>
                   </div>
-                  <small className="mono">{mintConfig.data?.objectId ?? AVATAR_CONTRACT.mintConfigId}</small>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card title="Actions" eyebrow="First Controls" tone="neutral">
-            <div className="action-layout">
-              <div className="stack">
-                <div className="info-box">
-                  <h3>Mint Lifecycle</h3>
-                  <p>
-                    Toggle mint availability using the published AdminCap and shared MintConfig object.
-                  </p>
-                  <div className="button-row">
-                    <button
-                      className="button button-secondary"
-                      onClick={handleResumeMint}
-                      disabled={!canAdmin || pendingAction !== null}
-                      type="button"
-                    >
-                      {pendingAction === "resume" ? "Resuming..." : "Resume Mint"}
-                    </button>
-                    <button
-                      className="button button-danger"
-                      onClick={handlePauseMint}
-                      disabled={!canAdmin || pendingAction !== null}
-                      type="button"
-                    >
-                      {pendingAction === "pause" ? "Pausing..." : "Pause Mint"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="info-box">
-                  <h3>Permissions</h3>
-                  <p>
-                    Admin actions are enabled only when the connected wallet matches the on-chain
-                    AdminCap owner.
-                  </p>
-                  <small className="mono">Expected owner: {adminOwner}</small>
-                </div>
-              </div>
-
-              <div className="info-box price-box">
-                <div className="price-header">
-                  <div>
-                    <h3>Set Mint Price</h3>
-                    <p>
-                      Enter a whole-number MIST value. This sends a programmable transaction block to
-                      <span className="mono"> set_mint_price</span>.
-                    </p>
-                  </div>
-                  <div className="pill pill-muted">PTB</div>
-                </div>
-
-                <div className="price-form">
-                  <label>
-                    <span>new_price_mist</span>
-                    <input
-                      className="input"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="0"
-                      value={priceInput}
-                      onChange={(event) => setPriceInput(event.target.value.replace(/[^\d]/g, ""))}
+                ) : (
+                  <div className="stack">
+                    <div className={`pill ${canAdmin ? "pill-success" : "pill-muted"}`}>
+                      {canAdmin ? "Connected wallet can administer this contract" : "Read-only mode"}
+                    </div>
+                    <DetailRow label="AdminCap Owner" value={adminOwner} mono />
+                    <DetailRow
+                      label="Connected Wallet"
+                      value={account?.address ?? "Connect wallet to unlock write actions"}
+                      mono
                     />
-                  </label>
+                  </div>
+                )}
+              </Card>
+
+              <Card title="Contract Info" eyebrow="References" tone="sky">
+                <div className="stack">
+                  <DetailRow label="Package ID" value={AVATAR_CONTRACT.packageId} mono />
+                  <DetailRow label="Module Name" value={AVATAR_CONTRACT.module} mono />
+                  <DetailRow label="Mint Config ID" value={AVATAR_CONTRACT.mintConfigId} mono />
+                  <DetailRow label="Transfer Policy ID" value={AVATAR_CONTRACT.transferPolicyId} mono />
+                </div>
+              </Card>
+            </section>
+
+            <section className="dashboard-grid">
+              <Card
+                title="Mint Config"
+                eyebrow="On-Chain State"
+                tone="sky"
+                action={
                   <button
-                    className="button button-primary"
-                    onClick={handleSetPrice}
-                    disabled={!canAdmin || pendingAction !== null || priceInput.trim().length === 0}
+                    className="button button-ghost"
+                    onClick={refreshMintConfig}
+                    disabled={mintConfig.isFetching}
                     type="button"
                   >
-                    {pendingAction === "set-price" ? "Saving..." : "Set Mint Price"}
+                    {mintConfig.isFetching ? "Refreshing..." : "Read Mint Config"}
                   </button>
+                }
+              >
+                {mintConfig.isLoading ? (
+                  <div className="loading-row">
+                    <Spinner />
+                    <span>Loading MintConfig object from chain...</span>
+                  </div>
+                ) : mintConfig.error ? (
+                  <div className="error-box">{parseError(mintConfig.error)}</div>
+                ) : (
+                  <div className="metric-grid">
+                    <MetricTile
+                      label="mint_price_mist"
+                      value={`${mintPriceMist} MIST`}
+                      helper={`≈ ${toSui(mintPriceMist)} SUI`}
+                    />
+                    <MetricTile
+                      label="mint_enabled"
+                      value={mintStatus}
+                      helper={
+                        mintConfig.data?.ownerKind === "shared"
+                          ? "Shared object"
+                          : "Owner state unavailable"
+                      }
+                    />
+                    <MetricTile
+                      label="treasury balance"
+                      value={treasuryDisplay}
+                      helper={`≈ ${toSui(mintConfig.data?.treasuryBalanceMist)} SUI`}
+                    />
+                    <div className="status-box">
+                      <span>Status</span>
+                      <div
+                        className={`pill ${
+                          mintConfig.data?.mintEnabled ? "pill-success" : "pill-danger"
+                        }`}
+                      >
+                        {mintStatus}
+                      </div>
+                      <small className="mono">
+                        {mintConfig.data?.objectId ?? AVATAR_CONTRACT.mintConfigId}
+                      </small>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              <Card title="Actions" eyebrow="Admin Controls" tone="neutral">
+                <div className="stack">
+                  <div className="info-box">
+                    <h3>Mint Lifecycle</h3>
+                    <p>
+                      Toggle mint availability using the published AdminCap and shared MintConfig
+                      object.
+                    </p>
+                    <div className="button-row">
+                      <button
+                        className="button button-secondary"
+                        onClick={handleResumeMint}
+                        disabled={!canAdmin || pendingAction !== null}
+                        type="button"
+                      >
+                        {pendingAction === "resume" ? "Resuming..." : "Resume Mint"}
+                      </button>
+                      <button
+                        className="button button-danger"
+                        onClick={handlePauseMint}
+                        disabled={!canAdmin || pendingAction !== null}
+                        type="button"
+                      >
+                        {pendingAction === "pause" ? "Pausing..." : "Pause Mint"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="info-box">
+                    <div className="section-heading">
+                      <div>
+                        <h3>Set Mint Price</h3>
+                        <p>
+                          Send a programmable transaction block to <span className="mono">set_mint_price</span>.
+                        </p>
+                      </div>
+                      <div className="pill pill-muted">PTB</div>
+                    </div>
+
+                    <div className="price-form">
+                      <label className="field">
+                        <FieldLabel label="new_price_mist" />
+                        <input
+                          className="input"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="0"
+                          value={priceInput}
+                          onChange={(event) =>
+                            setPriceInput(event.target.value.replace(/[^\d]/g, ""))
+                          }
+                        />
+                      </label>
+                      <button
+                        className="button button-primary"
+                        onClick={handleSetPrice}
+                        disabled={!canAdmin || pendingAction !== null || priceInput.trim().length === 0}
+                        type="button"
+                      >
+                        {pendingAction === "set-price" ? "Saving..." : "Set Mint Price"}
+                      </button>
+                    </div>
+
+                    <div className="metric-grid compact-grid">
+                      <MetricTile label="Current" value={`${mintPriceMist} MIST`} />
+                      <MetricTile
+                        label="Preview"
+                        value={`${priceInput.trim() || "0"} MIST`}
+                        helper={`≈ ${toSui(priceInput || "0")} SUI`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="info-box">
+                    <h3>Permissions</h3>
+                    <p>
+                      Admin actions are enabled only when the connected wallet matches the on-chain
+                      AdminCap owner.
+                    </p>
+                    <small className="mono">Expected owner: {adminOwner}</small>
+                  </div>
+                </div>
+              </Card>
+            </section>
+          </>
+        ) : (
+          <section className="mint-layout">
+            <Card title="Mint Avatar" eyebrow="Public Mint" tone="sky">
+              <div className="mint-form-grid">
+                <label className="field field-span-2">
+                  <FieldLabel label="Name" helper={`${mintForm.name.length}/${MINT_LIMITS.name}`} />
+                  <input
+                    className="input"
+                    maxLength={MINT_LIMITS.name}
+                    placeholder="Genesis Runner"
+                    value={mintForm.name}
+                    onChange={(event) => updateMintField("name", event.target.value)}
+                  />
+                </label>
+
+                <label className="field field-span-2">
+                  <FieldLabel
+                    label="Description"
+                    helper={`${mintForm.description.length}/${MINT_LIMITS.description}`}
+                  />
+                  <textarea
+                    className="textarea"
+                    maxLength={MINT_LIMITS.description}
+                    rows={4}
+                    value={mintForm.description}
+                    onChange={(event) => updateMintField("description", event.target.value)}
+                  />
+                </label>
+
+                <label className="field field-span-2">
+                  <FieldLabel label="Image URL" helper={`${mintForm.imageUrl.length}/${MINT_LIMITS.uri}`} />
+                  <input
+                    className="input"
+                    maxLength={MINT_LIMITS.uri}
+                    value={mintForm.imageUrl}
+                    onChange={(event) => updateMintField("imageUrl", event.target.value)}
+                  />
+                </label>
+
+                <label className="field field-span-2">
+                  <FieldLabel
+                    label="Base Model URI"
+                    helper={`${mintForm.baseModelUri.length}/${MINT_LIMITS.uri}`}
+                  />
+                  <input
+                    className="input"
+                    maxLength={MINT_LIMITS.uri}
+                    value={mintForm.baseModelUri}
+                    onChange={(event) => updateMintField("baseModelUri", event.target.value)}
+                  />
+                </label>
+
+                <label className="field field-span-2">
+                  <FieldLabel
+                    label="Portrait URI"
+                    helper={`${mintForm.portraitUri.length}/${MINT_LIMITS.uri}`}
+                  />
+                  <input
+                    className="input"
+                    maxLength={MINT_LIMITS.uri}
+                    value={mintForm.portraitUri}
+                    onChange={(event) => updateMintField("portraitUri", event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <FieldLabel label="Frame Type" />
+                  <select
+                    className="select"
+                    value={mintForm.frameType}
+                    onChange={(event) => updateMintField("frameType", Number(event.target.value))}
+                  >
+                    {FRAME_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <FieldLabel label="Skin Tone" />
+                  <select
+                    className="select"
+                    value={mintForm.skinTone}
+                    onChange={(event) => updateMintField("skinTone", Number(event.target.value))}
+                  >
+                    {SKIN_TONE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <FieldLabel label="Hair Type" />
+                  <select
+                    className="select"
+                    value={mintForm.hairType}
+                    onChange={(event) => updateMintField("hairType", Number(event.target.value))}
+                  >
+                    {HAIR_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <FieldLabel label="Hair Color" />
+                  <select
+                    className="select"
+                    value={mintForm.hairColor}
+                    onChange={(event) => updateMintField("hairColor", Number(event.target.value))}
+                  >
+                    {HAIR_COLOR_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field field-span-2">
+                  <FieldLabel label="Style Type" />
+                  <select
+                    className="select"
+                    value={mintForm.styleType}
+                    onChange={(event) => updateMintField("styleType", Number(event.target.value))}
+                  >
+                    {STYLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </Card>
+
+            <Card title="Mint Summary" eyebrow="Ready Check" tone="amber">
+              <div className="stack">
+                <div className="info-box">
+                  <h3>Live Mint Status</h3>
+                  <p>
+                    The button below uses the live on-chain config. It automatically switches between
+                    free mint and paid mint.
+                  </p>
+
+                  <div className="metric-grid compact-grid">
+                    <MetricTile label="Mint Mode" value={mintModeLabel} />
+                    <MetricTile label="Mint Status" value={mintStatus} />
+                  </div>
                 </div>
 
-                <div className="metric-grid compact-grid">
-                  <MetricTile
-                    label="Current"
-                    value={`${mintConfig.data?.mintPriceMist ?? "0"} MIST`}
-                  />
-                  <MetricTile
-                    label="Preview"
-                    value={`${priceInput.trim() || "0"} MIST`}
-                    helper={`≈ ${toSui(priceInput || "0")} SUI`}
-                  />
+                <div className="info-box">
+                  <h3>Starter Preset</h3>
+                  <p>
+                    This first mint page keeps the payload lean: you choose the key appearance inputs,
+                    and the rest of the avatar uses a stable starter profile.
+                  </p>
+
+                  <div className="token-row">
+                    {mintChoiceSummary.map((choice) => (
+                      <span className="token-pill" key={choice}>
+                        {choice}
+                      </span>
+                    ))}
+                  </div>
+
+                  <small>Level 1 start, 10 base points in every stat, calm voice, relaxed idle.</small>
+                </div>
+
+                <div className={`notice-box ${mintGuardMessage ? "notice-box-warning" : "notice-box-success"}`}>
+                  {mintGuardMessage ?? "Ready to mint on mainnet."}
+                </div>
+
+                {mintResult ? (
+                  <div className="info-box">
+                    <h3>Latest Mint</h3>
+                    <div className="stack">
+                      <DetailRow label="Avatar ID" value={mintResult.avatarId ?? "Unavailable"} mono />
+                      <DetailRow label="Digest" value={mintResult.digest} mono />
+                      <DetailRow label="Owner" value={mintResult.owner ?? account?.address ?? "Unknown"} mono />
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="action-button-stack">
+                  <button
+                    className="button button-ghost"
+                    onClick={() => setMintForm({ ...AVATAR_MINT_DEFAULTS })}
+                    type="button"
+                  >
+                    Reset Form
+                  </button>
+                  <button
+                    className="button button-primary"
+                    onClick={handleMintAvatar}
+                    disabled={mintGuardMessage !== null}
+                    type="button"
+                  >
+                    {pendingAction === "mint"
+                      ? "Minting..."
+                      : isFreeMint
+                        ? "Mint First Avatar"
+                        : `Mint Avatar for ${mintPriceMist} MIST`}
+                  </button>
                 </div>
               </div>
-            </div>
-          </Card>
-        </section>
+            </Card>
+          </section>
+        )}
       </main>
     </div>
   );
