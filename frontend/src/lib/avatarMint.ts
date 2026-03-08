@@ -14,6 +14,7 @@ export type AvatarMintFormValues = {
   skinTone: number;
   hairType: number;
   hairColor: number;
+  facePreset: number;
   styleType: number;
 };
 
@@ -47,6 +48,13 @@ type AvatarMintPayload = {
   idleStyle: number;
   walkStyle: number;
   baseEmotePack: number;
+};
+
+type FacePreset = MintOption & {
+  faceStyle: number;
+  eyeStyle: number;
+  mouthStyle: number;
+  expressionProfile: number;
 };
 
 export type AvatarMintResult = {
@@ -99,6 +107,49 @@ export const HAIR_COLOR_OPTIONS: MintOption[] = [
   { label: "Pink", value: 9 },
 ];
 
+export const FACE_PRESET_OPTIONS: FacePreset[] = [
+  {
+    label: "Sunny Smile",
+    value: 0,
+    faceStyle: 1,
+    eyeStyle: 3,
+    mouthStyle: 1,
+    expressionProfile: 2,
+  },
+  {
+    label: "Calm Dreamer",
+    value: 1,
+    faceStyle: 0,
+    eyeStyle: 1,
+    mouthStyle: 0,
+    expressionProfile: 0,
+  },
+  {
+    label: "Hero Focus",
+    value: 2,
+    faceStyle: 3,
+    eyeStyle: 2,
+    mouthStyle: 4,
+    expressionProfile: 1,
+  },
+  {
+    label: "Wink Mischief",
+    value: 3,
+    faceStyle: 4,
+    eyeStyle: 5,
+    mouthStyle: 1,
+    expressionProfile: 2,
+  },
+  {
+    label: "Sleepy Chill",
+    value: 4,
+    faceStyle: 2,
+    eyeStyle: 4,
+    mouthStyle: 5,
+    expressionProfile: 5,
+  },
+];
+
 export const STYLE_OPTIONS: MintOption[] = [
   { label: "Street", value: 0 },
   { label: "Tactical", value: 1 },
@@ -115,6 +166,7 @@ export const AVATAR_MINT_DEFAULTS: AvatarMintFormValues = {
   skinTone: 1,
   hairType: 1,
   hairColor: 0,
+  facePreset: 0,
   styleType: 5,
 };
 
@@ -145,6 +197,10 @@ function optionLabel(options: MintOption[], value: number) {
   return options.find((option) => option.value === value)?.label ?? String(value);
 }
 
+function resolveFacePreset(value: number) {
+  return FACE_PRESET_OPTIONS.find((preset) => preset.value === value) ?? FACE_PRESET_OPTIONS[0];
+}
+
 function buildRendererQuery(form: AvatarMintFormValues) {
   const params = new URLSearchParams({
     name: form.name.trim() || "Anavrin Avatar",
@@ -152,6 +208,7 @@ function buildRendererQuery(form: AvatarMintFormValues) {
     skinTone: String(form.skinTone),
     hairType: String(form.hairType),
     hairColor: String(form.hairColor),
+    facePreset: String(form.facePreset),
     styleType: String(form.styleType),
   });
 
@@ -168,6 +225,7 @@ export function buildMintChoiceSummary(form: AvatarMintFormValues) {
     optionLabel(SKIN_TONE_OPTIONS, form.skinTone),
     optionLabel(HAIR_TYPE_OPTIONS, form.hairType),
     optionLabel(HAIR_COLOR_OPTIONS, form.hairColor),
+    optionLabel(FACE_PRESET_OPTIONS, form.facePreset),
     optionLabel(STYLE_OPTIONS, form.styleType),
   ];
 }
@@ -195,6 +253,8 @@ export function buildAvatarMintPayload(
   form: AvatarMintFormValues,
   assets: AvatarRendererAssets
 ): AvatarMintPayload {
+  const facePreset = resolveFacePreset(form.facePreset);
+
   return {
     name: trimField(form.name, "Name", MINT_LIMITS.name),
     description: trimField(form.description, "Description", MINT_LIMITS.description),
@@ -207,12 +267,12 @@ export function buildAvatarMintPayload(
     hairColor: form.hairColor,
     heightClass: 1,
     bodyType: 1,
-    faceStyle: 1,
+    faceStyle: facePreset.faceStyle,
     eyeColor: 0,
-    eyeStyle: 1,
-    mouthStyle: 1,
+    eyeStyle: facePreset.eyeStyle,
+    mouthStyle: facePreset.mouthStyle,
     facialHair: 0,
-    expressionProfile: 1,
+    expressionProfile: facePreset.expressionProfile,
     voiceType: 0,
     styleType: form.styleType,
     idleStyle: 0,

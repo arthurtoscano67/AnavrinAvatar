@@ -89,6 +89,13 @@ const stylePalettes = [
 const frameLabels = ["Masculine", "Feminine"];
 const hairLabels = ["Bald", "Short", "Long", "Curly", "Braids", "Locs", "Ponytail", "Buzz", "Wavy"];
 const toneLabels = ["Light Peach", "Peach", "Peach Brown", "Brown", "Dark Brown"];
+const facePresetLabels = [
+  "Sunny Smile",
+  "Calm Dreamer",
+  "Hero Focus",
+  "Wink Mischief",
+  "Sleepy Chill",
+];
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -109,6 +116,7 @@ function readAppearance(url) {
   const skinTone = clamp(Number(url.searchParams.get("skinTone") || 0) || 0, 0, 4);
   const hairType = clamp(Number(url.searchParams.get("hairType") || 0) || 0, 0, 8);
   const hairColor = clamp(Number(url.searchParams.get("hairColor") || 0) || 0, 0, 9);
+  const facePreset = clamp(Number(url.searchParams.get("facePreset") || 0) || 0, 0, 4);
   const styleType = clamp(Number(url.searchParams.get("styleType") || 0) || 0, 0, 5);
   const palette = stylePalettes[styleType];
 
@@ -118,16 +126,16 @@ function readAppearance(url) {
     skinTone,
     hairType,
     hairColor,
+    facePreset,
     styleType,
     frameLabel: frameLabels[frameType],
     skinLabel: toneLabels[skinTone],
     hairLabel: hairLabels[hairType],
+    faceLabel: facePresetLabels[facePreset],
     styleLabel: palette.label,
     skinHex: skinTones[skinTone],
     hairHex: hairColors[hairColor],
     palette,
-    eyeTilt: frameType === 0 ? 0 : 4,
-    mouthTilt: frameType === 0 ? 10 : -10,
   };
 }
 
@@ -173,6 +181,20 @@ function outlinedStroke(d, color, width) {
 
 function simplePath(d, fill, opacity = 1) {
   return `<path d="${d}" fill="${fill}" fill-opacity="${opacity}" />`;
+}
+
+function solidStroke(d, color, width, opacity = 1) {
+  return `
+    <path
+      d="${d}"
+      fill="none"
+      stroke="${color}"
+      stroke-width="${width}"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-opacity="${opacity}"
+    />
+  `;
 }
 
 function badge(x, y, text, fill) {
@@ -275,7 +297,7 @@ function wavyFringe(appearance) {
 }
 
 function hairMarkup(appearance) {
-  const { hairType, hairHex } = appearance;
+  const { hairType, hairHex, palette } = appearance;
   const highlight = highlightHairColor(appearance);
 
   if (hairType === 0) {
@@ -349,31 +371,114 @@ function hairMarkup(appearance) {
   return `${base}${sideTufts}`;
 }
 
+function animeOpenEye(cx, cy, rx = 64, ry = 74) {
+  return `
+    ${outlinedEllipse(cx, cy, rx, ry, "#ffffff", 12)}
+    <ellipse cx="${cx}" cy="${cy + 14}" rx="${Math.max(18, rx - 42)}" ry="${Math.max(20, ry - 48)}" fill="#111111" />
+    <ellipse cx="${cx + 10}" cy="${cy - 2}" rx="7" ry="9" fill="#ffffff" />
+  `;
+}
+
+function animeAlmondEye(cx, cy, width = 142, height = 84) {
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const d = `
+    M ${cx - halfWidth} ${cy}
+    C ${cx - halfWidth * 0.42} ${cy - halfHeight}, ${cx + halfWidth * 0.42} ${cy - halfHeight}, ${cx + halfWidth} ${cy}
+    C ${cx + halfWidth * 0.42} ${cy + halfHeight}, ${cx - halfWidth * 0.42} ${cy + halfHeight}, ${cx - halfWidth} ${cy}
+    Z
+  `;
+
+  return `
+    ${outlinedPath(d, "#ffffff", 10)}
+    <ellipse cx="${cx}" cy="${cy + 12}" rx="18" ry="22" fill="#111111" />
+    <ellipse cx="${cx + 10}" cy="${cy - 3}" rx="7" ry="8" fill="#ffffff" />
+  `;
+}
+
+function animeSmileEye(cx, cy, width = 92, rise = 24) {
+  return solidStroke(
+    `M ${cx - width / 2} ${cy} C ${cx - width / 5} ${cy - rise}, ${cx + width / 5} ${cy - rise}, ${cx + width / 2} ${cy}`,
+    OUTLINE,
+    10
+  );
+}
+
+function animeSleepyEye(cx, cy) {
+  return `
+    ${outlinedEllipse(cx, cy, 58, 44, "#ffffff", 10)}
+    <ellipse cx="${cx}" cy="${cy + 10}" rx="18" ry="18" fill="#111111" />
+    ${solidStroke(`M ${cx - 58} ${cy - 8} C ${cx - 24} ${cy - 20}, ${cx + 24} ${cy - 20}, ${cx + 58} ${cy - 8}`, OUTLINE, 10)}
+  `;
+}
+
+function animeBlush(frameType, x, y, opacity = 0.18) {
+  const blush = frameType === 1 ? "#f7adb9" : "#c48364";
+  return `<ellipse cx="${x}" cy="${y}" rx="24" ry="14" fill="${blush}" fill-opacity="${opacity}" />`;
+}
+
 function faceMarkup(appearance) {
-  const { eyeTilt, mouthTilt, frameType, skinHex } = appearance;
-  const blush = frameType === 1 ? "#f8b8b8" : "#c18363";
+  const { facePreset, frameType, skinHex } = appearance;
+
+  let eyes = "";
+  let brows = "";
+  let mouth = "";
+  let cheeks = "";
+
+  if (facePreset === 0) {
+    eyes = `${animeSmileEye(442, 456)}${animeSmileEye(582, 456)}`;
+    brows = `
+      ${solidStroke("M 388 406 C 420 382, 456 380, 490 394", OUTLINE, 9)}
+      ${solidStroke("M 534 394 C 568 380, 604 382, 636 406", OUTLINE, 9)}
+    `;
+    mouth = solidStroke("M 464 578 C 496 604, 538 604, 568 578", OUTLINE, 8);
+    cheeks = `${animeBlush(frameType, 386, 536, 0.24)}${animeBlush(frameType, 640, 536, 0.24)}`;
+  } else if (facePreset === 1) {
+    eyes = `${animeOpenEye(442, 462)}${animeOpenEye(582, 462)}`;
+    brows = `
+      ${solidStroke("M 390 398 C 424 378, 458 378, 490 392", OUTLINE, 8)}
+      ${solidStroke("M 534 392 C 566 378, 600 378, 634 398", OUTLINE, 8)}
+    `;
+    mouth = solidStroke("M 474 582 C 502 596, 540 596, 566 578", OUTLINE, 7);
+    cheeks = `${animeBlush(frameType, 388, 540, 0.14)}${animeBlush(frameType, 638, 540, 0.14)}`;
+  } else if (facePreset === 2) {
+    eyes = `${animeAlmondEye(442, 458)}${animeAlmondEye(582, 458)}`;
+    brows = `
+      ${solidStroke("M 382 404 C 418 372, 462 368, 500 382", OUTLINE, 10)}
+      ${solidStroke("M 524 382 C 562 368, 606 372, 642 404", OUTLINE, 10)}
+    `;
+    mouth = solidStroke("M 474 584 C 504 594, 544 590, 576 576", OUTLINE, 8);
+  } else if (facePreset === 3) {
+    eyes = `${animeSmileEye(438, 458, 86, 20)}${animeOpenEye(586, 462, 60, 68)}`;
+    brows = `
+      ${solidStroke("M 388 402 C 420 384, 454 386, 484 398", OUTLINE, 8)}
+      ${solidStroke("M 540 392 C 570 374, 602 374, 632 388", OUTLINE, 9)}
+    `;
+    mouth = solidStroke("M 468 580 C 500 602, 542 598, 572 572", OUTLINE, 8);
+    cheeks = `${animeBlush(frameType, 390, 540, 0.18)}${animeBlush(frameType, 640, 540, 0.18)}`;
+  } else {
+    eyes = `${animeSleepyEye(442, 468)}${animeSleepyEye(582, 468)}`;
+    brows = `
+      ${solidStroke("M 392 398 C 424 390, 456 390, 488 398", OUTLINE, 8)}
+      ${solidStroke("M 536 398 C 568 390, 600 390, 632 398", OUTLINE, 8)}
+    `;
+    mouth = solidStroke("M 486 586 C 508 592, 532 592, 552 586", OUTLINE, 6);
+    cheeks = `${animeBlush(frameType, 388, 544, 0.1)}${animeBlush(frameType, 638, 544, 0.1)}`;
+  }
 
   return `
     ${outlinedCircle(348, 472, 24, skinHex, 10)}
     ${outlinedCircle(676, 472, 24, skinHex, 10)}
-    ${outlinedEllipse(442, 456, 74, 88, "#ffffff", 12)}
-    ${outlinedEllipse(582, 456, 74, 88, "#ffffff", 12)}
-    <ellipse cx="448" cy="${468 + eyeTilt}" rx="20" ry="24" fill="#111111" />
-    <ellipse cx="588" cy="${468 + eyeTilt}" rx="20" ry="24" fill="#111111" />
-    <ellipse cx="452" cy="${458 + eyeTilt}" rx="6" ry="8" fill="#ffffff" />
-    <ellipse cx="592" cy="${458 + eyeTilt}" rx="6" ry="8" fill="#ffffff" />
-    ${outlinedStroke("M 388 390 C 422 366, 458 366, 488 382", OUTLINE, 8)}
-    ${outlinedStroke("M 536 382 C 566 366, 602 366, 636 390", OUTLINE, 8)}
-    ${outlinedEllipse(514, 534, 18, 12, "#6a4537", 8)}
-    ${outlinedStroke(`M 472 590 C 500 ${612 + mouthTilt}, 548 ${612 + mouthTilt}, 576 586`, "#1a1214", 10)}
-    ${outlinedStroke("M 504 546 C 512 562, 514 576, 506 588", "#8d6148", 8)}
-    <ellipse cx="386" cy="532" rx="22" ry="14" fill="${blush}" fill-opacity="0.18" />
-    <ellipse cx="640" cy="532" rx="22" ry="14" fill="${blush}" fill-opacity="0.18" />
+    ${brows}
+    ${eyes}
+    ${outlinedEllipse(514, 542, 7, 5, "#8f624d", 4)}
+    ${mouth}
+    ${cheeks}
   `;
 }
 
 function avatarSvg(appearance, { animated = false, portrait = false, debug = false }) {
-  const { name, frameLabel, skinLabel, hairLabel, styleLabel, palette, skinHex } = appearance;
+  const { name, frameLabel, skinLabel, hairLabel, faceLabel, styleLabel, palette, skinHex } = appearance;
   const headY = portrait ? 420 : 432;
   const bodyTranslateY = portrait ? 24 : 40;
   const badgeY = portrait ? 98 : 112;
@@ -439,9 +544,10 @@ function avatarSvg(appearance, { animated = false, portrait = false, debug = fal
         debug
           ? `
             ${badge(96, badgeY, frameLabel, "#ffffff")}
-            ${badge(96, badgeY + 52, styleLabel, palette.hairAccent)}
+            ${badge(96, badgeY + 52, faceLabel, palette.hairAccent)}
+            ${badge(96, badgeY + 104, styleLabel, palette.bubble)}
             <text x="96" y="892" fill="#f8fafc" font-size="${portrait ? 42 : 48}" font-family="Inter, system-ui" font-weight="800">${escapeXml(name)}</text>
-            <text x="96" y="926" fill="#dbe5f3" font-size="18" font-family="Inter, system-ui">${escapeXml(skinLabel)} · ${escapeXml(hairLabel)}</text>
+            <text x="96" y="926" fill="#dbe5f3" font-size="18" font-family="Inter, system-ui">${escapeXml(skinLabel)} · ${escapeXml(hairLabel)} · ${escapeXml(faceLabel)}</text>
             <text x="96" y="952" fill="#ffffff" fill-opacity="0.52" font-size="15" font-family="Inter, system-ui">Generated by Railway renderer</text>
           `
           : `
@@ -530,6 +636,7 @@ const server = http.createServer((req, res) => {
         skinTone: appearance.skinTone,
         hairType: appearance.hairType,
         hairColor: appearance.hairColor,
+        facePreset: appearance.facePreset,
         styleType: appearance.styleType,
       },
       image: `${origin}/api/avatar/image.svg?${qs}`,

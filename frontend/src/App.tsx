@@ -10,6 +10,7 @@ import { useAvatarActions } from "./hooks/useAvatarActions";
 import { useAvatarAdminState, useAvatarMintConfig } from "./hooks/useAvatarContract";
 import {
   AVATAR_MINT_DEFAULTS,
+  FACE_PRESET_OPTIONS,
   FRAME_OPTIONS,
   HAIR_COLOR_OPTIONS,
   HAIR_TYPE_OPTIONS,
@@ -622,6 +623,21 @@ export function App() {
                       onChange={(event) => updateMintField("hairColor", Number(event.target.value))}
                     >
                       {HAIR_COLOR_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="field">
+                    <FieldLabel label="Anime Face Preset" />
+                    <select
+                      className="select"
+                      value={mintForm.facePreset}
+                      onChange={(event) => updateMintField("facePreset", Number(event.target.value))}
+                    >
+                      {FACE_PRESET_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
