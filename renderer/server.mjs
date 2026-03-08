@@ -395,12 +395,28 @@ function hairMarkup(appearance) {
   }
 
   if (hairType === 1) {
+    if (frameType === 1) {
+      return `
+        ${outlinedPath(
+          "M 382 366 C 390 300, 442 252, 512 244 C 582 252, 634 300, 642 366 L 620 354 L 602 328 L 572 336 L 546 308 L 514 318 L 486 302 L 456 330 L 426 322 L 404 346 Z",
+          hairHex,
+          12
+        )}
+        ${outlinedPath("M 384 366 C 366 384, 360 412, 366 442 C 372 462, 386 476, 402 478 L 404 438 C 394 430, 394 404, 402 380 Z", hairHex, 10)}
+        ${outlinedPath("M 640 366 C 658 384, 664 412, 658 442 C 652 462, 638 476, 622 478 L 620 438 C 630 430, 630 404, 622 380 Z", hairHex, 10)}
+        ${solidStroke("M 452 336 C 474 320, 550 320, 572 336", OUTLINE, 5, 0.22)}
+      `;
+    }
+
     return `
-      ${base}
-      ${outlinedStroke(bangPath(398, 320, 406, 340, 402, 392), hairHex, 20)}
-      ${outlinedStroke(bangPath(458, 312, 464, 336, 462, 386), highlight, 18)}
-      ${outlinedStroke(bangPath(566, 312, 560, 336, 562, 386), hairHex, 18)}
-      ${outlinedStroke(bangPath(626, 320, 618, 340, 622, 392), hairHex, 20)}
+      ${outlinedPath(
+        "M 360 372 C 366 300, 430 244, 512 234 C 594 244, 658 300, 664 372 L 640 360 L 624 332 L 596 338 L 572 308 L 544 316 L 512 286 L 480 316 L 450 306 L 426 334 L 396 328 L 378 350 Z",
+        hairHex,
+        12
+      )}
+      ${outlinedPath("M 360 372 C 336 392, 326 426, 332 466 C 338 488, 354 506, 378 510 L 382 450 C 368 440, 368 412, 380 382 Z", hairHex, 10)}
+      ${outlinedPath("M 664 372 C 688 392, 698 426, 692 466 C 686 488, 670 506, 646 510 L 642 450 C 656 440, 656 412, 644 382 Z", hairHex, 10)}
+      ${solidStroke("M 442 334 C 468 314, 556 314, 582 334", OUTLINE, 5, 0.22)}
     `;
   }
 
