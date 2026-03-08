@@ -239,6 +239,47 @@ function hoodieMarkup(appearance) {
   `;
 }
 
+// Lower body: waistband, pants legs, shoes — drawn in raw coordinate space
+// Scale transform in avatarSvg compresses everything to fit the 1024px canvas.
+function lowerBodyMarkup(appearance) {
+  const { palette, frameType } = appearance;
+  const waistColor = palette.hoodie;
+  const pantsColor = palette.hoodieShadow;
+  const accent = palette.hoodieAccent;
+
+  if (frameType === 1) {
+    // Feminine: narrower hips, slimmer legs, smaller shoes
+    return `
+      ${outlinedRect(352, 1016, 320, 40, 8, waistColor, 10)}
+      ${solidStroke("M 512 1016 L 512 1056", OUTLINE, 6, 0.28)}
+      ${outlinedRect(356, 1052, 142, 210, 10, pantsColor, 10)}
+      ${simplePath("M 356 1180 L 498 1180 L 498 1200 L 356 1200 Z", pantsColor, 0.22)}
+      ${outlinedRect(526, 1052, 142, 210, 10, pantsColor, 10)}
+      ${simplePath("M 526 1180 L 668 1180 L 668 1200 L 526 1200 Z", pantsColor, 0.22)}
+      ${solidStroke("M 512 1056 L 512 1094", OUTLINE, 7, 0.35)}
+      ${outlinedRect(338, 1262, 174, 44, 16, OUTLINE, 10)}
+      <rect x="350" y="1266" width="136" height="15" rx="5" fill="${accent}" fill-opacity="0.55" />
+      ${outlinedRect(512, 1262, 174, 44, 16, OUTLINE, 10)}
+      <rect x="524" y="1266" width="136" height="15" rx="5" fill="${accent}" fill-opacity="0.55" />
+    `;
+  }
+
+  // Masculine: wider hips, straight legs, chunkier shoes
+  return `
+    ${outlinedRect(328, 1016, 368, 44, 8, waistColor, 10)}
+    ${solidStroke("M 512 1016 L 512 1060", OUTLINE, 6, 0.28)}
+    ${outlinedRect(332, 1056, 166, 206, 10, pantsColor, 10)}
+    ${simplePath("M 332 1186 L 498 1186 L 498 1210 L 332 1210 Z", pantsColor, 0.24)}
+    ${outlinedRect(526, 1056, 166, 206, 10, pantsColor, 10)}
+    ${simplePath("M 526 1186 L 692 1186 L 692 1210 L 526 1210 Z", pantsColor, 0.24)}
+    ${solidStroke("M 512 1060 L 512 1102", OUTLINE, 8, 0.38)}
+    ${outlinedRect(310, 1262, 206, 46, 16, OUTLINE, 10)}
+    <rect x="322" y="1267" width="168" height="17" rx="6" fill="${accent}" fill-opacity="0.58" />
+    ${outlinedRect(508, 1262, 206, 46, 16, OUTLINE, 10)}
+    <rect x="520" y="1267" width="168" height="17" rx="6" fill="${accent}" fill-opacity="0.58" />
+  `;
+}
+
 function bangPath(startX, startY, controlX, controlY, endX, endY) {
   return `M ${startX} ${startY} C ${controlX} ${controlY}, ${controlX} ${controlY + 40}, ${endX} ${endY}`;
 }
@@ -341,6 +382,19 @@ function hairMarkup(appearance) {
   `;
 
   if (hairType === 3) {
+    if (frameType === 1) {
+      // Feminine curly: base clusters + side cascading curls for volume
+      return `
+        ${curlyClusters(appearance)}
+        ${base}
+        ${outlinedCircle(306, 400, 38, hairHex, 10)}
+        ${outlinedCircle(718, 400, 38, hairHex, 10)}
+        ${outlinedCircle(292, 468, 30, hairHex, 10)}
+        ${outlinedCircle(732, 468, 30, hairHex, 10)}
+        ${outlinedCircle(302, 538, 26, palette.hairAccent, 10)}
+        ${outlinedCircle(722, 538, 26, palette.hairAccent, 10)}
+      `;
+    }
     return `${curlyClusters(appearance)}${base}`;
   }
 
@@ -378,6 +432,21 @@ function hairMarkup(appearance) {
   }
 
   if (hairType === 2) {
+    if (frameType === 1) {
+      // Feminine long: wider, more voluminous cascading strands
+      return `
+        ${base}
+        ${sideTufts}
+        ${outlinedStroke("M 406 322 C 432 300, 448 308, 450 360", hairHex, 18)}
+        ${outlinedStroke("M 618 322 C 592 300, 576 308, 574 360", highlight, 18)}
+        ${outlinedStroke("M 330 390 C 286 514, 298 660, 362 782", hairHex, 34)}
+        ${outlinedStroke("M 694 390 C 738 514, 726 660, 662 782", hairHex, 34)}
+        ${outlinedStroke("M 354 398 C 318 508, 330 624, 386 732", hairHex, 24)}
+        ${outlinedStroke("M 670 398 C 706 508, 694 624, 638 732", hairHex, 24)}
+        ${outlinedStroke("M 374 402 C 348 502, 360 606, 408 706", highlight, 16)}
+      `;
+    }
+    // Masculine long
     return `
       ${base}
       ${sideTufts}
@@ -391,6 +460,17 @@ function hairMarkup(appearance) {
   }
 
   if (hairType === 8) {
+    if (frameType === 1) {
+      // Feminine wavy: base + fringe + flowing side strands
+      return `
+        ${base}
+        ${wavyFringe(appearance)}
+        ${simplePath("M 370 290 C 422 248, 590 248, 654 298", palette.hairAccent, 0.18)}
+        ${outlinedStroke("M 326 394 C 284 468, 282 574, 322 670", hairHex, 28)}
+        ${outlinedStroke("M 698 394 C 740 468, 742 574, 702 670", hairHex, 28)}
+        ${outlinedStroke("M 340 402 C 308 468, 310 558, 342 638", highlight, 18)}
+      `;
+    }
     return `${base}${wavyFringe(appearance)}${simplePath("M 370 290 C 422 248, 590 248, 654 298", palette.hairAccent, 0.18)}`;
   }
 
@@ -494,12 +574,35 @@ function headMarkup(appearance, headY) {
   );
 }
 
+// Realistic C-shaped ears with antihelix inner ridge detail
+function earMarkup(appearance) {
+  const { frameType, skinHex } = appearance;
+
+  if (frameType === 1) {
+    // Feminine: smaller, rounder ears
+    // Left ear: C opening right, protrudes left from head
+    // Right ear: C opening left, protrudes right from head
+    return `
+      ${outlinedPath("M 370 448 C 352 442 324 454 322 472 C 324 490 352 502 370 496 C 372 490 372 454 370 448 Z", skinHex, 10)}
+      ${solidStroke("M 365 454 C 340 454 331 462 331 472 C 331 482 340 490 365 490", OUTLINE, 3, 0.28)}
+      ${outlinedPath("M 654 448 C 672 442 700 454 702 472 C 700 490 672 502 654 496 C 652 490 652 454 654 448 Z", skinHex, 10)}
+      ${solidStroke("M 659 454 C 684 454 693 462 693 472 C 693 482 684 490 659 490", OUTLINE, 3, 0.28)}
+    `;
+  }
+
+  // Masculine: wider, more prominent ears
+  return `
+    ${outlinedPath("M 368 444 C 348 437 312 450 310 472 C 312 494 348 507 368 500 C 370 494 370 450 368 444 Z", skinHex, 10)}
+    ${solidStroke("M 362 450 C 332 450 322 460 322 472 C 322 484 332 494 362 494", OUTLINE, 4, 0.30)}
+    ${outlinedPath("M 656 444 C 676 437 712 450 714 472 C 712 494 676 507 656 500 C 654 494 654 450 656 444 Z", skinHex, 10)}
+    ${solidStroke("M 662 450 C 692 450 702 460 702 472 C 702 484 692 494 662 494", OUTLINE, 4, 0.30)}
+  `;
+}
+
 function faceMarkup(appearance) {
   const { facePreset, frameType, skinHex } = appearance;
   const leftEyeX = frameType === 1 ? 444 : 438;
   const rightEyeX = frameType === 1 ? 580 : 586;
-  const earLeftX = frameType === 1 ? 352 : 346;
-  const earRightX = frameType === 1 ? 672 : 678;
   const browLeft = frameType === 1 ? [394, 478] : [382, 494];
   const browRight = frameType === 1 ? [546, 630] : [530, 642];
   const eyeYOffset = frameType === 1 ? -4 : 2;
@@ -551,8 +654,7 @@ function faceMarkup(appearance) {
   }
 
   return `
-    ${outlinedCircle(earLeftX, 472, frameType === 1 ? 22 : 24, skinHex, 10)}
-    ${outlinedCircle(earRightX, 472, frameType === 1 ? 22 : 24, skinHex, 10)}
+    ${earMarkup(appearance)}
     ${brows}
     ${eyes}
     ${outlinedEllipse(514, frameType === 1 ? 538 : 544, frameType === 1 ? 6 : 7, frameType === 1 ? 4 : 5, "#8f624d", 4)}
@@ -563,6 +665,7 @@ function faceMarkup(appearance) {
 
 function avatarSvg(appearance, { animated = false, portrait = false, debug = false }) {
   const { name, frameLabel, skinLabel, hairLabel, faceLabel, styleLabel, palette, skinHex, frameType } = appearance;
+  const fullBody = !portrait;
   const headY = portrait ? 420 : 432;
   const bodyTranslateY = portrait ? 24 : 40;
   const badgeY = portrait ? 98 : 112;
@@ -570,6 +673,34 @@ function avatarSvg(appearance, { animated = false, portrait = false, debug = fal
   const neckWidth = frameType === 1 ? 52 : 76;
   const neckHeight = frameType === 1 ? 78 : 84;
   const neckRadius = frameType === 1 ? 20 : 24;
+
+  // Ground shadow ellipse y: lower for full body
+  const shadowCy = fullBody ? 1290 : 902;
+  const shadowRx = fullBody ? 220 : (portrait ? 150 : 196);
+
+  // The character group (with optional lower body)
+  const characterInner = `
+    <ellipse cx="512" cy="${shadowCy}" rx="${shadowRx}" ry="46" fill="#09111f" fill-opacity="0.24" />
+    ${hoodieMarkup(appearance)}
+    ${fullBody ? lowerBodyMarkup(appearance) : ""}
+    ${outlinedRect(neckX, 586, neckWidth, neckHeight, neckRadius, skinHex, 10)}
+    ${headMarkup(appearance, headY)}
+    ${faceMarkup(appearance)}
+    ${hairMarkup(appearance)}
+  `;
+
+  // For full body: wrap in y-scale transform so character + legs fit 1024px canvas.
+  // scale(1, 0.76) compresses y: canvas_y = (raw_y + bodyTranslateY) * 0.76
+  // Hair top (~178+40)*0.76 = 166 | Hoodie (~1018+40)*0.76 = 804 | Shoes (~1306+40)*0.76 = 1023
+  const characterGroup = fullBody
+    ? `<g transform="scale(1 0.76)">
+         <g transform="translate(0 ${bodyTranslateY})" filter="url(#softShadowFull)">
+           ${characterInner}
+         </g>
+       </g>`
+    : `<g transform="translate(0 ${bodyTranslateY})" filter="url(#softShadow)">
+         ${characterInner}
+       </g>`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
@@ -587,6 +718,9 @@ function avatarSvg(appearance, { animated = false, portrait = false, debug = fal
         <stop offset="1" stop-color="${palette.hairAccent}" stop-opacity="0" />
       </radialGradient>
       <filter id="softShadow" x="212" y="168" width="610" height="764" filterUnits="userSpaceOnUse">
+        <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#17111e" flood-opacity="0.28" />
+      </filter>
+      <filter id="softShadowFull" x="100" y="100" width="824" height="1400" filterUnits="userSpaceOnUse">
         <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#17111e" flood-opacity="0.28" />
       </filter>
       <clipPath id="frameClip">
@@ -614,18 +748,11 @@ function avatarSvg(appearance, { animated = false, portrait = false, debug = fal
               </circle>
               <g>
                 <animateTransform attributeName="transform" type="translate" values="0 0; 0 -16; 0 0" dur="4.8s" repeatCount="indefinite" />
-            `
-          : "<g>"
+                ${characterGroup}
+              </g>
+            </g>`
+          : `<g>${characterGroup}</g>`
       }
-          <g transform="translate(0 ${bodyTranslateY})" filter="url(#softShadow)">
-            <ellipse cx="512" cy="902" rx="${portrait ? 150 : 196}" ry="46" fill="#09111f" fill-opacity="0.24" />
-            ${hoodieMarkup(appearance)}
-            ${outlinedRect(neckX, 586, neckWidth, neckHeight, neckRadius, skinHex, 10)}
-            ${headMarkup(appearance, headY)}
-            ${faceMarkup(appearance)}
-            ${hairMarkup(appearance)}
-          </g>
-      </g>
 
       <rect x="84" y="84" width="856" height="856" rx="44" stroke="#ffffff" stroke-opacity="0.08" />
       ${
